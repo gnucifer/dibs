@@ -161,6 +161,7 @@ function dibs_example_frontend_form_submit($form, &$form_state) {
                               'Vat' => '33.78',
                             ),
     'customer_name'       => 'Firstname Lastname',
+    'params'              => array('x' => 'X', 'y' => 'Y', 'z' => 'Z'),
   );
 
   // Prepare the DIBS payment

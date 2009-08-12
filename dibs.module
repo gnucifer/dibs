@@ -337,6 +337,7 @@ function dibs_load_transaction($key = NULL, $op = 'tid') {
   if ($transaction = db_fetch_array($result)) {
     $transaction['order_info_long'] = unserialize($transaction['order_info_long']);
     $transaction['order_price_info'] = unserialize($transaction['order_price_info']);
+    $transaction['params'] = !empty($transaction['params']) ? unserialize($transaction['params']) : array();
     return $transaction;
   }
   else {
@@ -406,6 +407,7 @@ function dibs_payment_prepare($data, $redirect = TRUE) {
     'customer_country' => '',
     'customer_email' => $user->mail,
     'customer_phone' => '',
+    'params' => array(),
   );
 
   // Generating order id
@@ -413,7 +415,7 @@ function dibs_payment_prepare($data, $redirect = TRUE) {
 
   // Creating new api_hash
   $hash = sha1(time() . $order_id . drupal_get_private_key());
-
+  
   // Creating dibs transaction
   $transaction = array(
     'api_module' => $data['api_module'],
@@ -437,9 +439,10 @@ function dibs_payment_prepare($data, $redirect = TRUE) {
     'customer_country' => $data['customer_country'],
     'customer_email' => $data['customer_email'],
     'customer_phone' => $data['customer_phone'],
+    'params' => serialize($data['params']),
   );
   drupal_write_record('dibs_transactions', $transaction);
-
+  
   // Saving new api_hash in session
   $_SESSION['dibs'][$data['api_module']][$data['api_delta']]['hash'] = $hash;
 

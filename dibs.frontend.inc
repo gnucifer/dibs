@@ -115,6 +115,14 @@ function dibs_frontend_redirect_form($form_state = array(), $settings, $data) {
     '#type' => 'hidden',
     '#value' => $settings['general']['type'],
   );
+  $form['api_module'] = array(
+    '#type' => 'hidden',
+    '#value' => $data['api_module'],
+  );
+  $form['api_delta'] = array(
+    '#type' => 'hidden',
+    '#value' => $data['api_delta'],
+  );
 
   // Optional fields
   if (!empty($settings['general']['test_mode'])) {
@@ -172,6 +180,12 @@ function dibs_frontend_redirect_form($form_state = array(), $settings, $data) {
         '#type' => 'hidden',
         '#value' => $settings['flexwindow']['decorator'],
       );
+    }
+    else {
+      $form['decorator'] = array(
+        '#type' => 'hidden',
+        '#value' => '',
+      );      
     }
     if (!empty($settings['flexwindow']['voucher'])) {
       $form['voucher'] = array(
