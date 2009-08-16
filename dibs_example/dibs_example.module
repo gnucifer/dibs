@@ -67,6 +67,15 @@ function dibs_example_dibsapi($op = 'info', $delta = NULL, &$transaction = NULL,
   }
 }
 
+/**
+ * Implementation of hook_dibsapi_form_alter().
+ */
+function dibs_example_dibsapi_form_alter(&$form, $delta = NULL) {
+  $form['dibs_example_field'] = array(
+    '#type' => 'hidden',
+    '#value' => 'some value',
+  );
+}
 
 /**
  * Form builder; The example form

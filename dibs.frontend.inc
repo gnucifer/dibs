@@ -221,6 +221,12 @@ function dibs_frontend_redirect_form($form_state = array(), $settings, $data) {
 
   // Additional form fields
   $form['submit'] = array('#type' => 'submit', '#value' => t('Continue to DIBS payment'));
+  
+  // Executing the hook_dibsapi_form_alter
+  $func = $data['api_module'] .'_dibsapi_form_alter';
+  if (function_exists($func)) {
+    $func($form, $data['api_delta']);
+  }  
 
   return $form;
 }

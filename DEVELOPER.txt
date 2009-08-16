@@ -3,7 +3,7 @@ $Id
 API / HOOK_DIBSAPI
 =====================
 
-Take a look at the file hook_dibsapi.php in the module folder and 
+Take a look at the file hooks.php in the module folder and 
 the dibs_example.module.
 
 As you can see is it not required that you make a redirect in the 

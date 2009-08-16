@@ -479,6 +479,14 @@ function dibs_create_order_line_fields($data) {
         }
         $i++;
       }
+      $form['ordlinesx'] = array(
+        '#type' => 'hidden',
+        '#value' => $i,
+      );
+      $form['ordlinesx'] = array(
+        '#type' => 'hidden',
+        '#value' => $j-1,
+      );            
     }
   }
   return $form;
@@ -496,13 +504,20 @@ function dibs_create_price_line_fields($data) {
   $form = array();
   if (is_array($data)) {
     $i = 1;
+    $keys = array(); 
     foreach ($data as $key => $value) {
-      $form['priceinfo' . $i . '.' . $key] = array(
+      $field = 'delivery' . $i . '.' . drupal_ucfirst($key);
+      $keys[] = $field;      
+      $form[$field] = array(
         '#type' => 'hidden',
         '#value' => $value
       );
       $i++;
     }
+    $form['priceinfo_keys'] = array(
+      '#type' => 'hidden',
+      '#value' => implode(',', $keys),
+    );
   }
   return $form;
 }
@@ -519,16 +534,23 @@ function dibs_create_delivery_line_fields($data) {
   $form = array();
   if (is_array($data)) {
     $i = 1;
+    $keys = array();
     foreach ($data as $key => $value) {
       if (strpos($key, 'customer_') !== FALSE && !empty($value)) {
         $key = str_replace('customer_', '', $key);
-        $form['delivery' . $i . '.' . drupal_ucfirst($key)] = array(
+        $field = 'delivery' . $i . '.' . drupal_ucfirst($key);
+        $keys[] = $field;
+        $form[$field] = array(
           '#type' => 'hidden',
           '#value' => $value
         );
         $i++;
       }
     }
+    $form['delivery_keys'] = array(
+      '#type' => 'hidden',
+      '#value' => implode(',', $keys),
+    );
   }
   return $form;
 }

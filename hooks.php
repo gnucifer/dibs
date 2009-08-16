@@ -3,7 +3,7 @@
 
 /**
  * @file
- * Documentation for hook_dibsapi.
+ * Documentation for the hooks provided by the dibsapi module.
  */
 
 /**
@@ -70,6 +70,30 @@ function hook_dibsapi($op = 'info', $delta = NULL, &$transaction = NULL, $a3 = N
     case 'transaction_callback':
       // Doing some stuff when the payment is completed.
       // For example sending receipt mail or what else is needed
+      break;
+  }
+}
+
+/**
+ * Makes it possible to alter the form array used when redirecting an user to DIBS.
+ *
+ * @param &$form
+ *   The form array that can we altered.
+ * @param $delta
+ *   Which DIBS implementation to return.
+ *   Although it is most commonly an integer starting at 0, this is not mandatory.
+ * @return
+ *   No data are returned.
+ */
+function hook_dibsapi_form_alter(&$form, $delta = NULL) {
+  switch ($delta) {
+    case 0:
+        $form['dibs_example_field'] = array(
+          '#type' => 'hidden',
+          '#value' => 'some value',
+        );
+      break;
+    case 1:
       break;
   }
 }
