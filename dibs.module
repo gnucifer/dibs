@@ -506,7 +506,7 @@ function dibs_create_price_line_fields($data) {
     $i = 1;
     $keys = array(); 
     foreach ($data as $key => $value) {
-      $field = 'delivery' . $i . '.' . drupal_ucfirst($key);
+      $field = 'priceinfo' . $i . '.' . drupal_ucfirst($key);
       $keys[] = $field;      
       $form[$field] = array(
         '#type' => 'hidden',
