@@ -31,12 +31,17 @@ function dibs_frontend_redirect_page($hash) {
     return '';
   }
   elseif ($data['payment_status'] > 0) {
-    drupal_set_message(t('Error redirecting to DIBS: the payment has already made!'), 'error');
+    drupal_set_message(t('Error redirecting to DIBS: the payment was already made!'), 'error');
     return '';
   }
 
   // Loading settings
   $settings = dibs_load_settings($data['api_module'], $data['api_delta']);
+
+  if (empty($settings)) {
+    drupal_set_message(t('DIBS module is not configured for module %module, delta %delta.', array('%module' => $data['api_module'], '%delta' => $data['api_delta'])), 'error');
+    return t('Redirect could not be performed due to missing configuration settings.');
+  }
 
   // Getting redirect form
   $form = drupal_get_form('dibs_frontend_redirect_form', $settings, $data);
@@ -226,8 +231,8 @@ function dibs_frontend_redirect_form($form_state = array(), $settings, $data) {
   $func = $data['api_module'] .'_dibsapi_form_alter';
   if (function_exists($func)) {
     $func($form, $data['api_delta']);
-  }  
-
+  }
+  
   return $form;
 }
 
