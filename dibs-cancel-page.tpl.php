@@ -17,6 +17,6 @@
  */
 ?>
 <div id="dibs-cancel-page-<?php print $transaction['api_module']; ?>-<?php print $transaction['api_delta']; ?>" class="dibs-cancel-page clear-block">
-  <p><?php print t('The payment form was cancelled. Please click the button below to return to the payment again.'); ?></p>
+  <p><?php print t('The payment was cancelled. Please click the button below to retry.'); ?></p>
   <?php print $form; ?>
 </div>

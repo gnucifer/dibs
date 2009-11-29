@@ -273,21 +273,28 @@ function dibs_get_next_order_id($module, $delta, $update_table = TRUE, $add_pref
  *  - If TRUE will we try to merge the settings array with the default one.
  */
 function dibs_load_settings($module, $delta, $fallback = TRUE) {
-  $settings = variable_get('dibs_settings_' . $module . '_' . $delta, array());
+  $settings = (array) variable_get('dibs_settings_' . $module . '_' . $delta, array());
+  
+  // Merge in default settings.
   if ($fallback && ($module != DIBS_DEFAULT_MODULE || $delta != DIBS_DEFAULT_DELTA)) {
-    $merged_settings = array();
     $default_settings = variable_get('dibs_settings_' . DIBS_DEFAULT_MODULE . '_' . DIBS_DEFAULT_DELTA, array());
-    foreach ((array)$default_settings as $group => $child) {
+
+    // Only overwrite empty values in the module/delta specific settings.
+    foreach ((array) $default_settings as $group => $child) {
       if (is_array($child)) {
         foreach ($child as $key => $value) {
-          $merged_settings[$group][$key] = (drupal_strlen(trim($settings[$group][$key])) > 0) ? $settings[$group][$key] : $value;
+          if (drupal_strlen(trim($settings[$group][$key])) == 0) {
+            $settings[$group][$key] = $value;
+          }
         }
       }
       else {
-        $merged_settings[$group] = (drupal_strlen(trim($settings[$group][$key])) > 0) ? $settings[$group] : $child;
+        if (drupal_strlen(trim($settings[$group])) == 0) {
+          $settings[$group] = $child;
+        }
       }
     }
-    return $merged_settings;
+    return $settings;
   }
   else {
     $return = $settings;

@@ -16,7 +16,7 @@
 function dibs_frontend_redirect_page($hash) {
   // Loading the transaction
   $data = dibs_load_transaction($hash, 'hash');
-  $data['payment_price'] = (float)$data['payment_price'];
+  $data['payment_price'] = (float) $data['payment_price'];
 
   // Making some checks to check if the transaction is valid
   if (!empty($data['api_module']) && !empty($data['api_delta'])) {

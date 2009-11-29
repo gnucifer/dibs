@@ -16,5 +16,5 @@
  */
 ?>
 <div id="dibs-accept-page-<?php print $transaction['api_module']; ?>-<?php print $transaction['api_delta']; ?>" class="dibs-accept-page clear-block">
-  <p><?php print t('We have now received your payment. Thanks for the payment.'); ?></p>
+  <p><?php print t('Your payment was received. Thank you for doing business with us.'); ?></p>
 </div>

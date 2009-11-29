@@ -17,6 +17,6 @@
  */
 ?>
 <div id="dibs-redirect-page-<?php print $transaction['api_module']; ?>-<?php print $transaction['api_delta']; ?>" class="dibs-redirect-page clear-block">
-  <p><?php print t('You are now being redirected to the payment service. If you are not redirected automatically, then please click the button below'); ?></p>
+  <p><?php print t('You are now being redirected to the payment service. If you are not redirected automatically, then please click the button below.'); ?></p>
   <?php print $form; ?>
 </div>
