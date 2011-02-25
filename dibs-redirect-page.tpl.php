@@ -1,5 +1,4 @@
 <?php
-// $Id$
 
 /**
  * @file dibs-redirect-page.tpl.php

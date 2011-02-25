@@ -1,5 +1,4 @@
 <?php
-// $Id$
 
 /**
  * @file dibs-cancel-page.tpl.php

@@ -1,5 +1,4 @@
 <?php
-// $Id$
 
 /**
  * @file dibs-accept-page.tpl.php

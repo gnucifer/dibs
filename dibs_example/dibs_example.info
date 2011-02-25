@@ -1,4 +1,3 @@
-; $Id$
 name = DIBS example
 description = An example implementation of the DIBS API
 core = 6.x
