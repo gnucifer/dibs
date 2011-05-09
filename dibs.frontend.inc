@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Front end functions for the DIBS module
@@ -8,42 +7,40 @@
 /**
  * Page with hidden form fields that redirects to the DIBS payment
  *
- * @param string $hash
+ * @param array $transaction
  *
  * @return string
  */
-function dibs_frontend_redirect_page($hash) {
-  // Loading the transaction
-  $data = dibs_load_transaction($hash, 'hash');
-  $data['payment_price'] = (float) $data['payment_price'];
+function dibs_frontend_redirect_page($transaction) {
+  $transaction['payment_price'] = (float) $transaction['payment_price'];
 
   // Making some checks to check if the transaction is valid
-  if (!empty($data['api_module']) && !empty($data['api_delta'])) {
-    $info = module_invoke($data['api_module'], 'dibsapi', 'info', $data['api_delta']);
+  if (!empty($transaction['api_module']) && !empty($transaction['api_delta'])) {
+    $info = module_invoke($transaction['api_module'], 'dibsapi', 'info', $transaction['api_delta']);
     if (empty($info) || !is_array($info)) {
       drupal_set_message(t('Error redirecting to DIBS: api_module and/or api_delta is not valid!'), 'error');
       return '';
     }
   }
-  elseif (!empty($data['api_module']) || !empty($data['api_delta'])) {
+  elseif (!empty($transaction['api_module']) || !empty($transaction['api_delta'])) {
     drupal_set_message(t('Error redirecting to DIBS: api_module or api_delta is missing!'), 'error');
     return '';
   }
-  elseif ($data['payment_status'] > 0) {
+  elseif ($transaction['payment_status'] > 0) {
     drupal_set_message(t('Error redirecting to DIBS: the payment was already made!'), 'error');
     return '';
   }
 
   // Loading settings
-  $settings = dibs_load_settings($data['api_module'], $data['api_delta']);
+  $settings = dibs_load_settings($transaction['api_module'], $transaction['api_delta']);
 
   if (empty($settings)) {
-    drupal_set_message(t('DIBS module is not configured for module %module, delta %delta.', array('%module' => $data['api_module'], '%delta' => $data['api_delta'])), 'error');
+    drupal_set_message(t('DIBS module is not configured for module %module, delta %delta.', array('%module' => $transaction['api_module'], '%delta' => $transaction['api_delta'])), 'error');
     return t('Redirect could not be performed due to missing configuration settings.');
   }
 
   // Getting redirect form
-  $form = drupal_get_form('dibs_frontend_redirect_form', $settings, $data);
+  $form = drupal_get_form('dibs_frontend_redirect_form', $settings, $transaction);
 
   // We are forcing the accept-charset to be ISO-8859-1, else will the order and delivery
   // info sent to DIBS be shown with wrong characters in the payment window and in their
@@ -59,7 +56,7 @@ function dibs_frontend_redirect_page($hash) {
     }
   ", 'inline', 'footer');
 
-  return theme('dibs_redirect_page', $form, $settings, $data);
+  return theme('dibs_redirect_page', $form, $settings, $transaction);
 }
 
 /**
@@ -189,7 +186,7 @@ function dibs_frontend_redirect_form($form_state = array(), $settings, $data) {
       $form['decorator'] = array(
         '#type' => 'hidden',
         '#value' => '',
-      );      
+      );
     }
     if (!empty($settings['flexwindow']['voucher'])) {
       $form['voucher'] = array(
@@ -225,13 +222,13 @@ function dibs_frontend_redirect_form($form_state = array(), $settings, $data) {
 
   // Additional form fields
   $form['submit'] = array('#type' => 'submit', '#value' => t('Continue to DIBS payment'));
-  
+
   // Executing the hook_dibsapi_form_alter
   $func = $data['api_module'] .'_dibsapi_form_alter';
   if (function_exists($func)) {
     $func($form, $data['api_delta']);
   }
-  
+
   return $form;
 }
 
@@ -239,42 +236,40 @@ function dibs_frontend_redirect_form($form_state = array(), $settings, $data) {
  * The cancel page where the user has the possibility to go back to the
  * payment again
  *
- * @param string $hash
+ * @param array $transaction
  *
  * @return string
  */
-function dibs_frontend_cancel_page($hash) {
-  // Loading the transaction
-  $data = dibs_load_transaction($hash, 'hash');
-  $data['payment_price'] = (float)$data['payment_price'];
+function dibs_frontend_cancel_page($transaction) {
+  $transaction['payment_price'] = (float)$transaction['payment_price'];
 
   // Making some checks to check if the transaction is valid
-  if (!empty($data['api_module']) && !empty($data['api_delta'])) {
-    $info = module_invoke($data['api_module'], 'dibsapi', 'info', $data['api_delta']);
+  if (!empty($transaction['api_module']) && !empty($transaction['api_delta'])) {
+    $info = module_invoke($transaction['api_module'], 'dibsapi', 'info', $transaction['api_delta']);
     if (empty($info) || !is_array($info)) {
       drupal_set_message(t('Error redirecting to DIBS: api_module and/or api_delta is not valid!'), 'error');
       return '';
     }
   }
-  elseif (!empty($data['api_module']) || !empty($data['api_delta'])) {
+  elseif (!empty($transaction['api_module']) || !empty($transaction['api_delta'])) {
     drupal_set_message(t('Error redirecting to DIBS: api_module or api_delta is missing!'), 'error');
     return '';
   }
-  elseif ($data['payment_status'] > 0) {
+  elseif ($transaction['payment_status'] > 0) {
     drupal_set_message(t('Error redirecting to DIBS: the payment has already made!'), 'error');
     return '';
   }
 
-  // Invoking the module that implementet the payment
-  module_invoke($data['api_module'], 'dibsapi', 'transaction_cancel', $data['api_delta'], $data);
+  // Invoking the module that implemented the payment
+  module_invoke($transaction['api_module'], 'dibsapi', 'transaction_cancel', $transaction['api_delta'], $transaction);
 
   // Loading settings
-  $settings = dibs_load_settings($data['api_module'], $data['api_delta']);
+  $settings = dibs_load_settings($transaction['api_module'], $transaction['api_delta']);
 
   // Getting redirect form
-  $form = drupal_get_form('dibs_frontend_cancel_form', $settings, $data);
+  $form = drupal_get_form('dibs_frontend_cancel_form', $settings, $transaction);
 
-  return theme('dibs_cancel_page', $form, $settings, $data);
+  return theme('dibs_cancel_page', $form, $settings, $transaction);
 }
 
 /**
@@ -338,41 +333,47 @@ function dibs_frontend_cancel_form_submit($form, &$form_state) {
 /**
  * DIBS payment ok callback
  *
- * @param string $hash
+ * @param array $transaction
  */
-function dibs_frontend_dibs_callback_ok($hash) {
+function dibs_frontend_dibs_callback_ok($transaction) {
   if (isset($_REQUEST['transact'])) {
     $transact = $_REQUEST['transact'];
     $authkey = isset($_REQUEST['authkey']) ? $_REQUEST['authkey'] : '';
     $paytype = isset($_REQUEST['paytype']) ? $_REQUEST['paytype'] : '';
-    $transaction = dibs_load_transaction($hash, 'hash');
     if (!empty($transaction)) {
       $settings = dibs_load_settings($transaction['api_module'], $transaction['api_delta']);
       $md5_key = md5($settings['general']['md5_key2'] . md5($settings['general']['md5_key1'] . 'transact='. $transact .'&amount='. ($data['payment_price'] * 100) .'&currency='. $settings['general']['currency']));
-      if (($md5_key == $authkey) || empty($settings['md5'])) {
+      if ($md5_key == $authkey || empty($settings['md5'])) {
         // Updating transaction record with payment transaction id
-        db_query("UPDATE {dibs_transactions} SET payment_transaction_id = %d, payment_status = 1, payment_type = '%s' WHERE tid = %d", $transact, $paytype, $transaction['tid']);
+        $updated = db_query("UPDATE {dibs_transactions} SET payment_transaction_id = %d, payment_status = 1, payment_type = '%s' WHERE tid = %d", $transact, $paytype, $transaction['tid']);
 
-        // We are unsetting the transaction and loading it again to get the updated one.
-        unset($transaction);
-        $transaction = dibs_load_transaction($hash, 'hash');
+        if ($updated) {
+          watchdog('dibs', 'Transaction #@tid validated as OK.', array(
+            '@tid' => $transaction['tid'],
+          ), WATCHDOG_INFO);
+        }
 
-        // Invoking the module that implementet the payment
+        // Reload the transaction.
+        $transaction = dibs_transaction_load($transaction['tid']);
+
+        // Invoking the module that implemented the payment
         module_invoke($transaction['api_module'], 'dibsapi', 'transaction_callback', $transaction['api_delta'], $transaction);
       }
     }
+  }
+  else {
+    watchdog('dibs', 'Transaction not set in request data for OK callback, transaction #@tid.', array(
+      '@tid' => $transaction['tid'],
+    ), WATCHDOG_ERROR);
   }
 }
 
 /**
  * DIBS accept page
  *
- * @param string $hash
+ * @param array $transaction
  */
-function dibs_frontend_accept_page($hash) {
-  // Loading transaction
-  $transaction = dibs_load_transaction($hash, 'hash');
-
+function dibs_frontend_accept_page($transaction) {
   // Returning an error if the transaction is emtpy
   if (empty($transaction)) {
     drupal_set_message(t('An error occured. The transaction key is not valid!'), 'error');
@@ -382,7 +383,7 @@ function dibs_frontend_accept_page($hash) {
   // Unsetting the temporary session
   unset($_SESSION['dibs']);
 
-  // Invoking the module that implementet the payment
+  // Invoking the module that implemented the payment
   module_invoke($transaction['api_module'], 'dibsapi', 'transaction_accept', $transaction['api_delta'], $transaction);
 
   // Loading settings
@@ -391,5 +392,4 @@ function dibs_frontend_accept_page($hash) {
   // Returning the themed output
   return theme('dibs_accept_page', $settings, $transaction);
 }
-
 

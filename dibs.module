@@ -107,8 +107,8 @@ function dibs_menu() {
   );
   */
 
-  // Front pages
-  $items['payment/dibs/callbackok/%'] = array(
+  // Front end pages
+  $items['payment/dibs/callbackok/%dibs_transaction_hash'] = array(
     'title' => 'DIBS callback ok url',
     'description' => '',
     'type' => MENU_CALLBACK,
@@ -117,7 +117,8 @@ function dibs_menu() {
     'access callback' => TRUE,
     'file' => 'dibs.frontend.inc',
   );
-  $items['payment/dibs/accept/%'] = array(
+
+  $items['payment/dibs/accept/%dibs_transaction_hash'] = array(
     'title' => 'DIBS payment accepted',
     'description' => '',
     'type' => MENU_CALLBACK,
@@ -126,7 +127,8 @@ function dibs_menu() {
     'access arguments' => array('pay using dibs'),
     'file' => 'dibs.frontend.inc',
   );
-  $items['payment/dibs/cancel/%'] = array(
+
+  $items['payment/dibs/cancel/%dibs_transaction_hash'] = array(
     'title' => 'DIBS payment cancelled',
     'description' => '',
     'type' => MENU_CALLBACK,
@@ -135,7 +137,8 @@ function dibs_menu() {
     'access arguments' => array('pay using dibs'),
     'file' => 'dibs.frontend.inc',
   );
-  $items['payment/dibs/redirect/%'] = array(
+
+  $items['payment/dibs/redirect/%dibs_transaction_hash'] = array(
     'title' => 'Redirecting to DIBS payment',
     'description' => '',
     'type' => MENU_CALLBACK,
@@ -273,7 +276,7 @@ function dibs_get_next_order_id($module, $delta, $update_table = TRUE, $add_pref
  */
 function dibs_load_settings($module, $delta, $fallback = TRUE) {
   $settings = (array) variable_get('dibs_settings_' . $module . '_' . $delta, array());
-  
+
   // Merge in default settings.
   if ($fallback && ($module != DIBS_DEFAULT_MODULE || $delta != DIBS_DEFAULT_DELTA)) {
     $default_settings = variable_get('dibs_settings_' . DIBS_DEFAULT_MODULE . '_' . DIBS_DEFAULT_DELTA, array());
@@ -318,7 +321,7 @@ function dibs_load_settings($module, $delta, $fallback = TRUE) {
  *   A fully-loaded $stransaction array upon successful transaction load or FALSE if transaction
  *   cannot be loaded.
  */
-function dibs_load_transaction($key = NULL, $op = 'tid') {
+function dibs_transaction_load($key = NULL, $op = 'tid') {
   if ($op == 'tid' && is_numeric($key)) {
     $result = db_query('SELECT * FROM {dibs_transactions} WHERE tid = %d', $key);
   }
@@ -340,6 +343,23 @@ function dibs_load_transaction($key = NULL, $op = 'tid') {
 }
 
 /**
+ * Legacy name for dibs_transaction_load().
+ *
+ * Hold-over for backwards compatibility. Please switch to
+ * dibs_transaction_load at earliest convenience.
+ */
+function dibs_load_transaction($key = NULL, $op = 'tid') {
+  dibs_transaction_load($key = NULL, $op = 'tid');
+}
+
+/**
+ * Load transaction by hash.
+ */
+function dibs_transaction_hash_load($key = NULL) {
+  return dibs_transaction_load($key, 'hash');
+}
+
+/**
  * Preparing the payment
  * - Creating a transaction record in the db
  * - Redirecting the user to payment redirect page
@@ -348,7 +368,7 @@ function dibs_load_transaction($key = NULL, $op = 'tid') {
  * @param bool $redirect
  * - If set to FALSE will the function not automatically
  *   redirect the user to the DIBS form.
- * 
+ *
  * @return
  * - If $redirect is set to FALSE, will the api_hash value
  *   be returned.
@@ -409,7 +429,7 @@ function dibs_payment_prepare($data, $redirect = TRUE) {
 
   // Creating new api_hash
   $hash = sha1(time() . $order_id . drupal_get_private_key());
-  
+
   // Creating dibs transaction
   $transaction = array(
     'api_module' => $data['api_module'],
@@ -436,7 +456,7 @@ function dibs_payment_prepare($data, $redirect = TRUE) {
     'params' => serialize($data['params']),
   );
   drupal_write_record('dibs_transactions', $transaction);
-  
+
   // Saving new api_hash in session
   $_SESSION['dibs'][$data['api_module']][$data['api_delta']]['hash'] = $hash;
 
@@ -445,7 +465,7 @@ function dibs_payment_prepare($data, $redirect = TRUE) {
     drupal_goto('payment/dibs/redirect/'.$hash);
     exit;
   }
-  
+
   return $hash;
 }
 
@@ -480,7 +500,7 @@ function dibs_create_order_line_fields($data) {
       $form['ordlinesy'] = array(
         '#type' => 'hidden',
         '#value' => $j-1,
-      );            
+      );
     }
   }
   return $form;
@@ -498,10 +518,10 @@ function dibs_create_price_line_fields($data) {
   $form = array();
   if (is_array($data)) {
     $i = 1;
-    $keys = array(); 
+    $keys = array();
     foreach ($data as $key => $value) {
       $field = 'priceinfo' . $i . '.' . drupal_ucfirst($key);
-      $keys[] = $field;      
+      $keys[] = $field;
       $form[$field] = array(
         '#type' => 'hidden',
         '#value' => $value
