@@ -455,7 +455,13 @@ function dibs_payment_prepare($data, $redirect = TRUE) {
     'customer_phone' => $data['customer_phone'],
     'params' => serialize($data['params']),
   );
-  drupal_write_record('dibs_transactions', $transaction);
+  $transaction_status = drupal_write_record('dibs_transactions', $transaction);
+
+  if ($transaction_status != SAVED_NEW) {
+    watchdog('dibs', 'Failed to save transaction to database, error code #@code.', array(
+      '@code' => db_error(),
+    ), WATCHDOG_ERROR);
+  }
 
   // Saving new api_hash in session
   $_SESSION['dibs'][$data['api_module']][$data['api_delta']]['hash'] = $hash;

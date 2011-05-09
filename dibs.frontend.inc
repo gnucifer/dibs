@@ -327,7 +327,6 @@ function dibs_frontend_cancel_form_submit($form, &$form_state) {
   drupal_goto('payment/dibs/redirect/' . $hash);
 
   exit;
-
 }
 
 /**
