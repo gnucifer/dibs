@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Install file for DIBS.
@@ -121,26 +120,22 @@ function dibs_schema() {
       'payment_type' => array(
         'type' => 'varchar',
         'length' => 10,
-        'not null' => FALSE,
         'description' => t('The payment type the user choose in the payment window.'),
       ),
       'payment_transaction_type' => array(
         'type' => 'varchar',
         'length' => 10,
-        'not null' => FALSE,
         'description' => t('For later use.'),
       ),
       'payment_transaction_id' => array(
         'type' => 'int',
         'unsigned' => TRUE,
-        'not null' => TRUE,
         'length' => 10,
         'description' => t('Transaction id from DIBS.'),
       ),
       'customer_uid' => array(
         'type' => 'int',
         'unsigned' => TRUE,
-        'not null' => TRUE,
         'length' => 10,
         'description' => t('User ID'),
       ),
@@ -335,3 +330,27 @@ function dibs_update_6003() {
 
   return $ret;
 }
+
+/**
+ * Allow NULLs in payment_transaction_id and customer_uid.
+ *
+ * This fixes an issue with less forgiving versions of MySQL.
+ */
+function dibs_update_6004() {
+  $ret = array();
+
+  db_change_field($ret, 'dibs_transactions', 'payment_transaction_id', 'payment_transaction_id', array(
+    'type' => 'int',
+    'unsigned' => TRUE,
+    'length' => 10,
+  ));
+
+  db_change_field($ret, 'dibs_transactions', 'customer_uid', 'customer_uid', array(
+    'type' => 'int',
+    'unsigned' => TRUE,
+    'length' => 10,
+  ));
+
+  return $ret;
+}
+
