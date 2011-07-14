@@ -56,7 +56,7 @@ function dibs_frontend_redirect_page($transaction) {
     }
   ", 'inline', 'footer');
 
-  return theme('dibs_redirect_page', $form, $settings, $transaction);
+  return theme('dibs_redirect_page', array('form' => $form, 'settings' => $settings, 'transaction' => $transaction));
 }
 
 /**
@@ -261,7 +261,10 @@ function dibs_frontend_cancel_page($transaction) {
   }
 
   // Invoking the module that implemented the payment
-  module_invoke($transaction['api_module'], 'dibsapi', 'transaction_cancel', $transaction['api_delta'], $transaction);
+  $function = $transaction['api_module'] . '_dibsapi'
+  if (function_exists($function)) {
+    $function('transaction_cancel', $transaction['api_delta'], $transaction);
+  }
 
   // Loading settings
   $settings = dibs_load_settings($transaction['api_module'], $transaction['api_delta']);
@@ -269,7 +272,7 @@ function dibs_frontend_cancel_page($transaction) {
   // Getting redirect form
   $form = drupal_get_form('dibs_frontend_cancel_form', $settings, $transaction);
 
-  return theme('dibs_cancel_page', $form, $settings, $transaction);
+  return theme('dibs_cancel_page', array('form' => $form, 'settings' => $settings, 'transaction' => $transaction));
 }
 
 /**
@@ -368,7 +371,10 @@ function dibs_frontend_dibs_callback_ok($transaction) {
         $transaction = dibs_transaction_load($transaction['tid']);
 
         // Invoking the module that implemented the payment
-        module_invoke($transaction['api_module'], 'dibsapi', 'transaction_callback', $transaction['api_delta'], $transaction);
+        $function = $transaction['api_module'] . '_dibsapi'
+        if (function_exists($function)) {
+          $function('transaction_callback', $transaction['api_delta'], $transaction);
+        }
       }
     }
   }
@@ -395,12 +401,15 @@ function dibs_frontend_accept_page($transaction) {
   unset($_SESSION['dibs']);
 
   // Invoking the module that implemented the payment
-  module_invoke($transaction['api_module'], 'dibsapi', 'transaction_accept', $transaction['api_delta'], $transaction);
+  $function = $transaction['api_module'] . '_dibsapi'
+  if (function_exists($function)) {
+    $function('transaction_accept', $transaction['api_delta'], $transaction);
+  }
 
   // Loading settings
   $settings = dibs_load_settings($transaction['api_module'], $transaction['api_delta']);
 
   // Returning the themed output
-  return theme('dibs_accept_page', array('settings'=>$settings, 'transaction'=>$transaction));
+  return theme('dibs_accept_page', array('settings' => $settings, 'transaction' => $transaction));
 }
 
