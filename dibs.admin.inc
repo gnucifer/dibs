@@ -67,7 +67,7 @@ function dibs_admin_settings_form($form, &$form_state, $module = NULL, $delta = 
   $default = dibs_is_default($module, $delta);
 
   // Setting page title
-  drupal_set_title(t('Change DIBS implementation settings: %module > %delta', array('%module' => t($module), '%delta' => $info['info'])));
+  drupal_set_title(t('Change DIBS implementation settings: @module > @delta', array('@module' => t($module), '@delta' => $info['info'])));
 
   // Loading settings
   $settings = dibs_load_settings($module, $delta, FALSE);

@@ -69,7 +69,7 @@ function dibs_frontend_redirect_page($transaction) {
  *
  * @return array
  */
-function dibs_frontend_redirect_form($node, &$form_state = array(), $settings, $data) {
+function dibs_frontend_redirect_form($form, &$form_state = array(), $settings, $data) {
   if (isset($data['payment_retry_count']) && $data['payment_retry_count']) {
     $data['payment_order_id'] .= '-' . $data['payment_retry_count'];
   }
@@ -261,7 +261,7 @@ function dibs_frontend_cancel_page($transaction) {
   }
 
   // Invoking the module that implemented the payment
-  $function = $transaction['api_module'] . '_dibsapi'
+  $function = $transaction['api_module'] . '_dibsapi';
   if (function_exists($function)) {
     $function('transaction_cancel', $transaction['api_delta'], $transaction);
   }
@@ -371,7 +371,7 @@ function dibs_frontend_dibs_callback_ok($transaction) {
         $transaction = dibs_transaction_load($transaction['tid']);
 
         // Invoking the module that implemented the payment
-        $function = $transaction['api_module'] . '_dibsapi'
+        $function = $transaction['api_module'] . '_dibsapi';
         if (function_exists($function)) {
           $function('transaction_callback', $transaction['api_delta'], $transaction);
         }
@@ -401,7 +401,7 @@ function dibs_frontend_accept_page($transaction) {
   unset($_SESSION['dibs']);
 
   // Invoking the module that implemented the payment
-  $function = $transaction['api_module'] . '_dibsapi'
+  $function = $transaction['api_module'] . '_dibsapi';
   if (function_exists($function)) {
     $function('transaction_accept', $transaction['api_delta'], $transaction);
   }
