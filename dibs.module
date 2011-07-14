@@ -87,13 +87,32 @@ function dibs_theme() {
 }
 
 /**
+ * Implementation of hook_menu_alter().
+ */
+function dibs_menu_alter(&$items) {
+  // Add a general payment config area, if none is present
+  if (!isset($items['admin/config/payment'])) {
+    $items['admin/config/payment'] = array(
+      'title' => 'Payment',
+      'description' => 'Payment integration modules.',
+      'position' => 'right',
+      'weight' => -10,
+      'page callback' => 'system_admin_menu_block_page',
+      'access arguments' => array('access administration pages'),
+      'file' => 'system.admin.inc',
+      'file path' => drupal_get_path('module', 'system'),
+    );
+  }
+}
+
+/**
  * Implementation of hook_menu().
  */
 function dibs_menu() {
   $items = array();
 
   // Settings pages
-  $items['admin/settings/dibs'] = array(
+  $items['admin/config/payment/dibs'] = array(
     'page callback' => 'dibs_admin_settings_list',
     'title' => 'DIBS settings',
     'description' => 'Configure DIBS payment gateway.',
@@ -102,9 +121,9 @@ function dibs_menu() {
     'access arguments' => array('administer dibs settings'),
     'file' => 'dibs.admin.inc',
   );
-  $items['admin/settings/dibs/edit/%/%'] = array(
+  $items['admin/config/payment/dibs/edit/%/%'] = array(
     'page callback' => 'drupal_get_form',
-    'page arguments' => array('dibs_admin_settings_form', 4, 5),
+    'page arguments' => array('dibs_admin_settings_form', 5, 6),
     'title' => 'Change DIBS implementation settings',
     'type' => MENU_CALLBACK,
     'access arguments' => array('administer dibs settings'),

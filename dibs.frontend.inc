@@ -349,7 +349,14 @@ function dibs_frontend_dibs_callback_ok($transaction) {
       $md5_key = md5($settings['general']['md5_key2'] . md5($settings['general']['md5_key1'] . 'transact='. $transact .'&amount='. ($data['payment_price'] * 100) .'&currency='. $settings['general']['currency']));
       if ($md5_key == $authkey || empty($settings['md5'])) {
         // Updating transaction record with payment transaction id
-        $updated = db_query("UPDATE {dibs_transactions} SET payment_transaction_id = %d, payment_status = 1, payment_type = '%s' WHERE tid = %d", $transact, $paytype, $transaction['tid']);
+        $updated = db_update('dibs_transactions')
+          ->fields(array(
+            'payment_transaction_id' => $transact,
+            'payment_status' => 1,
+            'payment_type' => $paytype,
+          ))
+          ->condition('tid', $transaction['tid'])
+          ->execute();
 
         if ($updated) {
           watchdog('dibs', 'Transaction #@tid validated as OK.', array(

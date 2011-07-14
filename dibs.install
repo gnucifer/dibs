@@ -9,9 +9,6 @@
  */
 function dibs_install() {
   // Create tables.
-  // Database table is automatically created based on schema during 
-  // module installation so no need to call drupal_install_schema() 
-  // from hook_install() any more.
 
   // Inserting default order id setting
   $db_id = db_insert('dibs_order_id_settings')
@@ -35,12 +32,6 @@ function dibs_uninstall() {
     ->condition('module', 'dibs')
     ->execute();
   menu_cache_clear_all();
-  // Remove tables.
-  // As of Drupal 7, a call to drupal_uninstall_schema() is no longer necessary. 
-  // See http://drupal.org/update/modules/6/7: "A module no longer should 
-  // explicitly install or uninstall its database schema in hook_install() 
-  // or hook_uninstall()."
-  // drupal_uninstall_schema('dibs');
 }
 
 /**
@@ -88,15 +79,11 @@ function dibs_schema() {
       'order_info_long' => array(
         'type' => 'text',
         'not null' => TRUE,
-        // 'default' => '',
-        // BLOB/TEXT column 'order_info_long' can't have a default value
         'description' => 'Order info long. Serialized',
       ),
       'order_price_info' => array(
         'type' => 'text',
         'not null' => TRUE,
-        // 'default' => '',
-        // BLOB/TEXT column 'order_price_info' can't have a default value
         'description' => t('Order price info. Serialized'),
       ),
       'payment_time' => array(
@@ -104,6 +91,7 @@ function dibs_schema() {
         // 'mysql_type', 'pgsql_type', 'sqlite_type', etc.: If you need to use a record type not included in the officially supported list of types above, you can specify a type for each database backend. In this case, you can leave out the type parameter, but be advised that your schema will fail to load on backends that do not have a type specified.
         // jfr. http://api.drupal.org/api/drupal/includes--database--schema.inc/group/schemaapi/7
         'mysql_type' => 'datetime',
+        'pgsql_type' => 'datetime',
         'description' => t('Payment time'),
         'not null' => FALSE,
       ),
@@ -253,6 +241,7 @@ function dibs_schema() {
         // 'mysql_type', 'pgsql_type', 'sqlite_type', etc.: If you need to use a record type not included in the officially supported list of types above, you can specify a type for each database backend. In this case, you can leave out the type parameter, but be advised that your schema will fail to load on backends that do not have a type specified.
         // jfr. http://api.drupal.org/api/drupal/includes--database--schema.inc/group/schemaapi/7
         'mysql_type' => 'datetime',
+        'pgsql_type' => 'datetime',
         'description' => t('Log time'),
         'not null' => FALSE,
       ),

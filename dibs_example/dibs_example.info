@@ -2,5 +2,4 @@ name = DIBS example
 description = An example implementation of the DIBS API
 core = 7.x
 dependencies[] = dibs
-project = "dibs"
-version = "7.x-1.x-dev"
+package = "dibs"
