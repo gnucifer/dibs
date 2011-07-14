@@ -39,11 +39,11 @@ function commerce_dibs_dibsapi($op = 'info', $delta = NULL, &$transaction = NULL
 
       if ($order && $commerce_transaction) {
         if ($commerce_transaction->status == COMMERCE_PAYMENT_STATUS_SUCCESS) {
-          $transaction['redirect'] = 'checkout/' . $transaction['order_id'] . '/payment/return/' . $transaction['params']['payment_redirect_key'];
+          drupal_goto('checkout/' . $order->order_id . '/payment/return/' . $transaction['params']['payment_redirect_key']);
         }
         else {
           drupal_set_message(t('Unable to verify your payment, please try again.'), 'error');
-          $transaction['redirect'] = 'checkout/' . $transaction['order_id'] . '/payment/back/' . $transaction['params']['payment_redirect_key'];
+          drupal_goto('checkout/' . $order->order_id . '/payment/back/' . $transaction['params']['payment_redirect_key']);
         }
       }
       else {

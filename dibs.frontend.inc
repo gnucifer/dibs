@@ -376,6 +376,12 @@ function dibs_frontend_dibs_callback_ok($transaction) {
           $function('transaction_callback', $transaction['api_delta'], $transaction);
         }
       }
+      else {
+        watchdog('dibs', "MD5 key didn't match for transaction, got @md5_in expected @md5_calc" , array(
+          '@md5_in' => $authkey,
+          '@md5_calc' => $md5_key,
+        ), WATCHDOG_WARNING);
+      }
     }
   }
   else {
