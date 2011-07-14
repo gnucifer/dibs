@@ -86,7 +86,7 @@ function dibs_frontend_redirect_form($form, &$form_state = array(), $settings, $
   );
   $form['currency'] = array(
     '#type' => 'hidden',
-    '#value' => $settings['general']['currency'],
+    '#value' => !empty($data['payment_currency']) ? $data['payment_currency'] : $settings['general']['currency'],
   );
   $form['lang'] = array(
     '#type' => 'hidden',
@@ -151,7 +151,7 @@ function dibs_frontend_redirect_form($form, &$form_state = array(), $settings, $
     );
   }
   if (!empty($settings['general']['md5'])) {
-    $md5_key = md5($settings['general']['md5_key2'] . md5($settings['general']['md5_key1'] . 'merchant=' . $settings['general']['merchant'] . '&orderid=' . $data['payment_order_id'] . '&currency=' . $settings['general']['currency'] . '&amount=' . $data['payment_price'] * 100));
+    $md5_key = md5($settings['general']['md5_key2'] . md5($settings['general']['md5_key1'] . 'merchant=' . $settings['general']['merchant'] . '&orderid=' . $data['payment_order_id'] . '&currency=' . $form['currency']['#value'] . '&amount=' . $data['payment_price'] * 100));
     $form['md5key'] = array(
       '#type' => 'hidden',
       '#value' => $md5_key,
