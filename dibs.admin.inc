@@ -14,6 +14,7 @@ function dibs_admin_settings_list() {
   drupal_add_css(drupal_get_path('module', 'dibs') .'/dibs.admin.css');
 
   // Looping through all modules that implement the hook_dibsapi.
+  $attributes['class'][] = 'dibs-admin-settings-list';
   $output = '<br />';
   $i = 0;
   foreach ((array)module_implements('dibsapi') as $module) {
@@ -37,7 +38,7 @@ function dibs_admin_settings_list() {
       );
       $rows[] = $row;
     }
-    $output .= theme('table', $header, $rows, array('class' => 'dibs-admin-settings-list'));
+    $output .= theme('table', array('header'=>$header, 'rows'=>$rows, 'attributes'=>$attributes));
   }
 
   return $output;
@@ -54,7 +55,7 @@ function dibs_admin_settings_list() {
  * @see dibs_admin_settings_form_validate()
  * @see dibs_admin_settings_form_submit()
  */
-function dibs_admin_settings_form($form_state = array(), $module = NULL, $delta = NULL) {
+function dibs_admin_settings_form($node, &$form_state = array(), $module = NULL, $delta = NULL) {
   // Checking if the module and delta exists
   $info = module_invoke($module, 'dibsapi', 'info', $delta);
   if (empty($info) || !is_array($info)) {
@@ -66,7 +67,7 @@ function dibs_admin_settings_form($form_state = array(), $module = NULL, $delta 
   $default = dibs_is_default($module, $delta);
 
   // Setting page title
-  drupal_set_title(t('Change DIBS implementation settings: %module > %delta', array('%module' => t($module), '%delta' => $info['info'])));
+  drupal_set_title(t('Change DIBS implementation settings: %module > %delta', array('%module' => t($module), '%delta' => $info['info'])), PASS_THROUGH);
 
   // Loading settings
   $settings = dibs_load_settings($module, $delta, FALSE);
@@ -273,7 +274,7 @@ function dibs_admin_settings_form($form_state = array(), $module = NULL, $delta 
     '#maxlength' => 10,
     '#legnth' => 10,
     '#required' => FALSE,
-    '#default_value' => !empty($settings['orderid']['order_id']) ? $settings['orderid']['order_id'] : '',
+    '#default_value' => !empty($settings['orderid']['order_id']) ? $settings['orderid']['order_id'] : '0',
     '#description' => t('The next order ID value. Only numeric values are allowed. Please besure that the range used does not conflict with order IDs on existing payments in DIBS, and other implementations of the DIBS module.')
   );
   $form['orderid']['order_id_prefix'] = array(
@@ -369,7 +370,7 @@ function dibs_admin_settings_form_validate($form, &$form_state) {
   }
 
   // Checking order ID settings
-  if ($default && empty($form_state['values']['orderid']['order_id'])) {
+  if ($form_state['values']['orderid']['order_id'] == '') {
     form_set_error('orderid][order_id', t('Please, fill in the next order ID.'));
   }
   elseif (!empty($form_state['values']['orderid']['order_id']) && !is_numeric($form_state['values']['orderid']['order_id'])) {
@@ -417,15 +418,37 @@ function dibs_admin_settings_form_submit($form, &$form_state) {
   variable_set('dibs_settings_' . $module . '_' . $delta, $settings);
 
   // Saving order ID settings
-  $result = db_result(db_query("SELECT api_module FROM {dibs_order_id_settings} WHERE api_module = '%s' AND api_delta = '%s'", $module, $delta));
+  $result = db_query('
+    SELECT api_module 
+    FROM {dibs_order_id_settings}
+    WHERE api_module = :api_module
+    AND api_delta = :api_delta',
+    array(':api_module' => $module, ':api_delta' => $delta,)
+  );
 
-  if (!empty($result)) {
-    db_query("UPDATE {dibs_order_id_settings} SET order_id = %d, order_id_suffix = '%s', order_id_prefix = '%s' WHERE api_module = '%s' AND api_delta = '%s'",
-      $orderid['order_id'], $orderid['order_id_suffix'], $orderid['order_id_prefix'], $module, $delta);
+  if ($result->rowCount()) {
+    //  $orderid['order_id'], $orderid['order_id_suffix'], $orderid['order_id_prefix'], $module, $delta);
+    $updated = db_update('dibs_order_id_settings')
+      ->fields(array(
+        'order_id' => $orderid['order_id'],
+        'order_id_suffix' => $orderid['order_id_suffix'],
+        'order_id_prefix' => $orderid['order_id_prefix'],
+      ))
+      ->condition('api_module', $module)
+      ->condition('api_delta', $delta)
+      ->execute();
   }
   else {
-    db_query("INSERT INTO {dibs_order_id_settings} (api_module, api_delta, order_id, order_id_prefix, order_id_suffix) VALUES ('%s', '%s', %d, '%s', '%s')",
-      $module, $delta, $orderid['order_id'], $orderid['order_id_prefix'], $orderid['order_id_suffix']);
+    //  $module, $delta, $orderid['order_id'], $orderid['order_id_prefix'], $orderid['order_id_suffix']);
+    $nid = db_insert('dibs_order_id_settings')
+    ->fields(array(
+      'api_module' => $module,
+      'api_delta' => $delta,
+      'order_id' => $orderid['order_id'],
+      'order_id_prefix' => $orderid['order_id_prefix'],
+      'order_id_suffix' => $orderid['order_id_suffix'],
+      ))
+    ->execute();
   }
 
   drupal_get_messages();

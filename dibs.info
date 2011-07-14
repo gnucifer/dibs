@@ -1,3 +1,7 @@
 name = DIBS
 description = An API module that makes it possible for other modules to receive payments via DIBS Payment Gateway
-core = 6.x
+core = 7.x
+project = "dibs"
+version = "7.x-1.x-dev"
+files[] = dibs.admin.inc
+files[] = dibs.frontend.inc

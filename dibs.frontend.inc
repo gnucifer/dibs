@@ -69,8 +69,8 @@ function dibs_frontend_redirect_page($transaction) {
  *
  * @return array
  */
-function dibs_frontend_redirect_form($form_state = array(), $settings, $data) {
-  if ($data['payment_retry_count']) {
+function dibs_frontend_redirect_form($node, &$form_state = array(), $settings, $data) {
+  if (isset($data['payment_retry_count']) && $data['payment_retry_count']) {
     $data['payment_order_id'] .= '-' . $data['payment_retry_count'];
   }
 
@@ -284,8 +284,8 @@ function dibs_frontend_cancel_page($transaction) {
  * @ingroup forms
  * @see dibs_frontend_cancel_form_submit()
  */
-function dibs_frontend_cancel_form($form_state = array(), $settings, $data) {
-  $form['hash'] = array('#type' => 'value', '#value' => $data['api_hash']);
+function dibs_frontend_cancel_form($node, &$form_state = array(), $settings, $data) {
+  $form['hash'] = array('#type' => 'hidden', '#value' => $data['api_hash']);
   $form['submit'] = array('#type' => 'submit', '#value' => t('Return to DIBS payment'));
   return $form;
 }
@@ -313,7 +313,12 @@ function dibs_frontend_cancel_form_submit($form, &$form_state) {
       // Generating order id
       $order_id = dibs_get_next_order_id($data['api_module'], $data['api_delta']);
       // Updating transaction
-      db_query("UPDATE {dibs_transactions} SET payment_order_id = '%s' WHERE api_hash = '%s'", $order_id, $hash);
+      $updated = db_update('dibs_transactions')
+        ->fields(array(
+          'payment_order_id' => $order_id,
+          ))
+        ->condition('api_hash', $hash)
+        ->execute();
       break;
     case 'add_retry_suffix':
       $suffixed = array(
@@ -389,6 +394,6 @@ function dibs_frontend_accept_page($transaction) {
   $settings = dibs_load_settings($transaction['api_module'], $transaction['api_delta']);
 
   // Returning the themed output
-  return theme('dibs_accept_page', $settings, $transaction);
+  return theme('dibs_accept_page', array('settings'=>$settings, 'transaction'=>$transaction));
 }
 

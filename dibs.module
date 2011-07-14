@@ -32,11 +32,25 @@ function dibs_help($path, $arg) {
 }
 
 /**
- * Implementation of hook_perm().
+ * Implementation of hook_permission().
  */
-function dibs_perm() {
-  return array('pay using dibs', 'administer dibs settings', 'administer dibs transactions');
+function dibs_permission() {
+  return array(
+    'pay using dibs' => array(
+      'title' => t('Pay using dibs'),
+      'description' => t('Pay using dibs.'),
+    ),
+    'administer dibs settings' => array(
+      'title' => t('Administer dibs settings'),
+      'description' => t('Administer dibs settings.'),
+    ),
+    'administer dibs transactions' => array(
+      'title' => t('Administer dibs transactions'),
+      'description' => t('Administer dibs transactions.'),
+    ),
+  );
 }
+
 
 /**
  * Implementation of hook_theme().
@@ -44,19 +58,30 @@ function dibs_perm() {
 function dibs_theme() {
   $themes = array();
   $themes['dibs_redirect_page'] = array(
-    'arguments' => array('form' => NULL, 'settings' => NULL, 'transaction' => NULL),
+    'variables' => array(
+        'form' => NULL,
+        'settings' => NULL,
+        'transaction' => NULL
+    ),
     'template' => 'dibs-redirect-page',
   );
   $themes['dibs_cancel_page'] = array(
-    'arguments' => array('form' => NULL, 'settings' => NULL, 'transaction' => NULL),
+    'variables' => array(
+      'form' => NULL,
+      'settings' => NULL,
+      'transaction' => NULL
+    ),
     'template' => 'dibs-cancel-page',
   );
   $themes['dibs_accept_page'] = array(
-    'arguments' => array('settings' => NULL, 'transaction' => NULL),
+    'variables' => array(
+      'settings' => NULL,
+      'transaction' => NULL
+    ),
     'template' => 'dibs-accept-page',
   );
   $themes['dibs_redirect_form'] = array(
-    'arguments' => array('element' => NULL),
+    'variables' => array('element' => NULL),
   );
   return $themes;
 }
@@ -235,12 +260,21 @@ function dibs_get_settings_value($module, $delta, $group, $key, $default_value =
  * @return multi
  */
 function dibs_get_next_order_id($module, $delta, $update_table = TRUE, $add_prefix_suffix = TRUE, $fallback = TRUE) {
-  db_lock_table('dibs_order_id_settings');
-  $settings = db_fetch_array(db_query("SELECT * FROM {dibs_order_id_settings} WHERE api_module = '%s' AND api_delta = '%s'", $module, $delta));
-  if (empty($settings) && $fallback) {
-    // Unlocking tables
-    db_unlock_tables();
+  $txn = db_transaction();
 
+  $result = db_query("
+    SELECT *
+    FROM {dibs_order_id_settings}
+    WHERE api_module = :module
+    AND api_delta = :delta",
+    array(
+      ':module' => $module,
+      ':delta' => $delta,
+    )
+  );
+  $settings = $result->fetchAssoc();
+
+  if (empty($settings) && $fallback) {
     // We try to get the data from the default setting instead
     return dibs_get_next_order_id(DIBS_DEFAULT_MODULE, DIBS_DEFAULT_DELTA, $update_table, $add_prefix_suffix, FALSE);
   }
@@ -249,19 +283,17 @@ function dibs_get_next_order_id($module, $delta, $update_table = TRUE, $add_pref
 
     // Updating value in table
     if ($update_table) {
-      db_query("UPDATE {dibs_order_id_settings} SET order_id = %d WHERE api_module = '%s' AND api_delta = '%s'", $next_order_id, $module, $delta);
+      db_update('dibs_order_id_settings')
+        ->fields(array('order_id' => $next_order_id))
+        ->condition('api_module', $module)
+        ->condition('api_delta', $delta)
+        ->execute();
     }
-
-    // Unlocking tables
-    db_unlock_tables();
 
     // Returns the found value
     return $add_prefix_suffix ? $settings['order_id_prefix'] . $next_order_id . $settings['order_id_suffix'] : $next_order_id;
   }
   else {
-    // Unlocking tables
-    db_unlock_tables();
-
     return NULL;
   }
 }
@@ -302,7 +334,17 @@ function dibs_load_settings($module, $delta, $fallback = TRUE) {
     $return = $settings;
 
     // Loading order id settings
-    $orderid = db_fetch_array(db_query("SELECT * FROM {dibs_order_id_settings} WHERE api_module = '%s' AND api_delta = '%s'", $module, $delta));
+    $result = db_query("
+      SELECT *
+      FROM {dibs_order_id_settings}
+      WHERE api_module = :module
+      AND api_delta = :delta",
+      array(
+        ':module' => $module,
+        ':delta' => $delta,
+      )
+    );
+    $orderid = $result->fetchAssoc();
 
     // Mergning arrays and returns them
     return array_merge($return, array('orderid' => $orderid));
@@ -323,15 +365,25 @@ function dibs_load_settings($module, $delta, $fallback = TRUE) {
  */
 function dibs_transaction_load($key = NULL, $op = 'tid') {
   if ($op == 'tid' && is_numeric($key)) {
-    $result = db_query('SELECT * FROM {dibs_transactions} WHERE tid = %d', $key);
+    $result = db_query('
+      SELECT *
+      FROM {dibs_transactions}
+      WHERE tid = :tid',
+      array(':tid' => $key)
+    );
   }
   elseif ($op == 'hash' && !empty($key)) {
-    $result = db_query("SELECT * FROM {dibs_transactions} WHERE api_hash = '%s'", $key);
+    $result = db_query('
+      SELECT *
+      FROM {dibs_transactions}
+      WHERE api_hash = :api_hash',
+      array(':api_hash' => $key)
+    );
   }
   else {
     return FALSE;
   }
-  if ($transaction = db_fetch_array($result)) {
+  if ($transaction = $result->fetchAssoc()) {
     $transaction['order_info_long'] = unserialize($transaction['order_info_long']);
     $transaction['order_price_info'] = unserialize($transaction['order_price_info']);
     $transaction['params'] = !empty($transaction['params']) ? unserialize($transaction['params']) : array();
@@ -399,7 +451,10 @@ function dibs_payment_prepare($data, $redirect = TRUE) {
   if (!empty($hash) && is_string($hash)) {
     // We are forcing the system to use a new transaction id for every load of this page,
     // therefore are we deleting the old transaction record
-    db_query("DELETE FROM {dibs_transactions} WHERE payment_status < 1 AND api_hash = '%s'", $hash);
+    $num_deleted = db_delete('dibs_transactions')
+      ->condition('payment_status', 1, '<')
+      ->condition('api_hash', $hash)
+      ->execute();
     $hash = NULL;
   }
 
@@ -444,6 +499,7 @@ function dibs_payment_prepare($data, $redirect = TRUE) {
     'payment_currency' => $settings['general']['currency'],
     'payment_price' => $data['payment_price'],
     'payment_transaction_type' => $data['payment_transaction_type'],
+    'payment_transaction_id' => NULL,
     'customer_uid' => $data['customer_uid'],
     'customer_name' => $data['customer_name'],
     'customer_address' => $data['customer_address'],
