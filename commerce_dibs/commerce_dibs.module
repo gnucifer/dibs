@@ -150,6 +150,7 @@ function commerce_dibs_redirect_form($form, &$form_state, $order, $payment_metho
   $hash = dibs_payment_prepare($data, FALSE);
   $dibs_transaction = dibs_transaction_hash_load($hash);
   $settings = dibs_load_settings('commerce_dibs', 'commerce_dibs');
+  $settings['auto_submit'] = 1;
 
   module_load_include('inc', 'dibs', 'dibs.frontend');
 

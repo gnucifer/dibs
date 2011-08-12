@@ -38,6 +38,7 @@ function dibs_frontend_redirect_page($transaction) {
     drupal_set_message(t('DIBS module is not configured for module %module, delta %delta.', array('%module' => $transaction['api_module'], '%delta' => $transaction['api_delta'])), 'error');
     return t('Redirect could not be performed due to missing configuration settings.');
   }
+  $settings['auto_submit'] = 1;
 
   // Getting redirect form
   $form = drupal_get_form('dibs_frontend_redirect_form', $settings, $transaction);
@@ -48,13 +49,6 @@ function dibs_frontend_redirect_page($transaction) {
   if ($settings['general']['type'] == 'pay') {
     $form = str_replace('accept-charset="UTF-8"', 'accept-charset="ISO-8859-1"', $form);
   }
-
-  // Adding autosubmit javascript
-  drupal_add_js("
-    if (Drupal.jsEnabled) {
-      $(document).ready($('#dibs-frontend-redirect-form').submit());
-    }
-  ", 'inline', 'footer');
 
   return theme('dibs_redirect_page', array('form' => $form, 'settings' => $settings, 'transaction' => $transaction));
 }
@@ -222,6 +216,9 @@ function dibs_frontend_redirect_form($form, &$form_state = array(), $settings, $
 
   // Additional form fields
   $form['submit'] = array('#type' => 'submit', '#value' => t('Continue to DIBS payment'));
+  if (!empty($settings['auto_submit'])) {
+    $form['submit']['#attached']['js'][] = drupal_get_path('module', 'dibs') . '/dibs.auto_submit.js';
+  }
 
   // Executing the hook_dibsapi_form_alter
   $func = $data['api_module'] .'_dibsapi_form_alter';
