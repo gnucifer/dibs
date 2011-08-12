@@ -493,7 +493,7 @@ function dibs_payment_prepare($data, $redirect = TRUE) {
     'customer_city' => '',
     'customer_zipcode' => '',
     'customer_country' => '',
-    'customer_email' => $user->mail,
+    'customer_email' => !empty($user->mail) ? $user->mail : '',
     'customer_phone' => '',
     'params' => array(),
   );
