@@ -56,6 +56,7 @@ function commerce_dibs_dibsapi($op = 'info', $delta = NULL, &$transaction = NULL
       if ($commerce_transaction) {
         $commerce_transaction->message = 'Payment completed at DIBS';
         $commerce_transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+        $commerce_transaction->remove_id = $transaction['payment_transaction_id'];
         commerce_payment_transaction_save($commerce_transaction);
       }
       break;
