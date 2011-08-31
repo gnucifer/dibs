@@ -142,6 +142,12 @@ function dibs_schema() {
         'length' => 10,
         'description' => t('Transaction id from DIBS.'),
       ),
+      'split_payments' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'default' => 1,
+        'description' => t('The number of payments the transaction is splited into, 1 for default usage (no splits).'),
+      ),
       'customer_uid' => array(
         'type' => 'int',
         'unsigned' => TRUE,
@@ -298,6 +304,30 @@ function dibs_schema() {
     ),
     'primary key' => array('api_module', 'api_delta'),
   );
+
+  $schema['dibs_split_payments'] = array(
+    'description' => t('Used to store split payment transaction ids'),
+    'fields' => array(
+      'tid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => t('Transaction ID.'),
+      ),
+      'payment_transaction_id' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'description' => t('Transaction id from DIBS.'),
+      ),
+      'delta' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'description' => t('The transaction delta.'),
+      ),
+    ),
+    'primary key' => array('tid', 'payment_transaction_id'),
+  );
+
   return $schema;
 }
 
@@ -368,3 +398,39 @@ function dibs_update_6004() {
   return $ret;
 }
 
+/**
+ * Add database suport for split payments.
+ */
+function dibs_update_7000(&$sandbox) {
+  // Add field for storing number of split payments.
+  db_add_field('dibs_transactions', 'split_payments', array(
+    'type' => 'int',
+    'unsigned' => TRUE,
+    'default' => 1,
+    'description' => t('The number of payments the transaction is splited into, 1 for default usage (no splits).'),
+  ));
+  db_create_table('dibs_split_payments', array(
+    'description' => t('Used to store split payment transaction ids'),
+    'fields' => array(
+      'tid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'length' => 10,
+        'description' => t('Transaction ID.'),
+      ),
+      'payment_transaction_id' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'length' => 10,
+        'description' => t('Transaction id from DIBS.'),
+      ),
+      'delta' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'description' => t('The transaction delta.'),
+      ),
+    ),
+    'primary key' => array('tid', 'payment_transaction_id'),
+  ));
+}
