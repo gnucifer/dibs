@@ -157,7 +157,7 @@ function dibs_frontend_redirect_form($form, &$form_state = array(), $settings, $
       '#value' => 1,
     );
   }
-  if (!empty($settings['advanced']['calcfee'])) {
+  if (!empty($settings['advanced']['calcfee']) && $split == 1) {
     $form['calcfee'] = array(
       '#type' => 'hidden',
       '#value' => 1,

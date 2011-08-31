@@ -19,14 +19,17 @@ function commerce_dibs_dibsapi($op = 'info', $delta = NULL, &$transaction = NULL
       }
       break;
     case 'transaction_cancel':
-      $commerce_transaction = commerce_payment_transaction_load($transaction['params']['commerce_transaction_id']);
+      $commerce_transactions = commerce_payment_transaction_load_multiple(FALSE, array('remote_id' => $transaction['tid']));
       $order = commerce_order_load($transaction['params']['commerce_order_id']);
 
-      if ($order && $commerce_transaction) {
+      if ($order && $commerce_transactions) {
         drupal_set_message(t('You have canceled your payment at DIBS'), 'warning');
-        $commerce_transaction->message = 'Declined payment';
-        $commerce_transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
-        commerce_payment_transaction_save($commerce_transaction);
+        // Update transaction(s).
+        foreach ($commerce_transactions as $commerce_transaction) {
+          $commerce_transaction->message = 'Declined payment';
+          $commerce_transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
+          commerce_payment_transaction_save($commerce_transaction);
+        }
         drupal_goto('checkout/' . $order->order_id . '/payment/back/' . $transaction['params']['payment_redirect_key']);
       }
       else {
@@ -34,30 +37,42 @@ function commerce_dibs_dibsapi($op = 'info', $delta = NULL, &$transaction = NULL
       }
       break;
     case 'transaction_accept':
-      $commerce_transaction = commerce_payment_transaction_load($transaction['params']['commerce_transaction_id']);
+      $commerce_transactions = commerce_payment_transaction_load_multiple(FALSE, array('remote_id' => $transaction['tid']));
       $order = commerce_order_load($transaction['params']['commerce_order_id']);
 
-      if ($order && $commerce_transaction) {
-        if ($commerce_transaction->status == COMMERCE_PAYMENT_STATUS_SUCCESS) {
-          drupal_goto('checkout/' . $order->order_id . '/payment/return/' . $transaction['params']['payment_redirect_key']);
+      if ($order && $commerce_transactions) {
+        foreach ($commerce_transactions as $commerce_transaction) {
+          if ($commerce_transaction->status !== COMMERCE_PAYMENT_STATUS_SUCCESS) {
+            drupal_set_message(t('Unable to verify your payment, please try again.'), 'error');
+            drupal_goto('checkout/' . $order->order_id . '/payment/back/' . $transaction['params']['payment_redirect_key']);
+          }
         }
-        else {
-          drupal_set_message(t('Unable to verify your payment, please try again.'), 'error');
-          drupal_goto('checkout/' . $order->order_id . '/payment/back/' . $transaction['params']['payment_redirect_key']);
-        }
+        drupal_goto('checkout/' . $order->order_id . '/payment/return/' . $transaction['params']['payment_redirect_key']);
       }
       else {
         // TODO: Set error message.
       }
       break;
     case 'transaction_callback':
-      $commerce_transaction = commerce_payment_transaction_load($transaction['params']['commerce_transaction_id']);
-
-      if ($commerce_transaction) {
-        $commerce_transaction->message = 'Payment completed at DIBS';
-        $commerce_transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
-        $commerce_transaction->remove_id = $transaction['payment_transaction_id'];
-        commerce_payment_transaction_save($commerce_transaction);
+      $commerce_transactions = commerce_payment_transaction_load_multiple(FALSE, array('remote_id' => $transaction['tid']));
+      // Update transaction(s).
+      if ($commerce_transactions) {
+        if ($transaction['split_payments'] == 1) {
+          $commerce_transaction = array_shift($commerce_transactions);
+          $commerce_transaction->message = 'Payment completed at DIBS';
+          $commerce_transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+          $commerce_transaction->payload['dibs_id'] = $transaction['payment_transaction_id'];
+          commerce_payment_transaction_save($commerce_transaction);
+        }
+        else {
+          foreach ($commerce_transactions as $commerce_transaction) {
+            $delta = $commerce_transaction->payload['delta'];
+            $commerce_transaction->message = 'Payment completed at DIBS';
+            $commerce_transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+            $commerce_transaction->payload['dibs_id'] = $transaction['dibs_split_payments'][$delta];
+            commerce_payment_transaction_save($commerce_transaction);
+          }
+        }
       }
       break;
   }
@@ -87,6 +102,13 @@ function commerce_dibs_settings_form($settings = NULL) {
 
   $form['info']['#markup'] = l(t('Setup commerce dibs'), 'admin/config/payment/dibs/edit/commerce_dibs/commerce_dibs');
 
+  $form['split'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Use split payments'),
+    '#default_value' => $settings['split'],
+    '#description' => t('Split each line item into a seperate transaction using split payments. Only works with flex window.'),
+  );
+
   return $form;
 }
 
@@ -95,16 +117,36 @@ function commerce_dibs_settings_form($settings = NULL) {
  *   use function for building a WPS form.
  */
 function commerce_dibs_redirect_form($form, &$form_state, $order, $payment_method) {
+  $use_split = !empty($payment_method['settings']['split']);
   // Save the transaction, so we know that it has been made in the commerce UI.
   $order = commerce_order_load($order->order_id);
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
-  $transaction = commerce_payment_transaction_new('commerce_dibs', $order->order_id);
-  $transaction->instance_id = $payment_method['instance_id'];
-  $transaction->amount = $order_wrapper->commerce_order_total->amount->value();
-  $transaction->currency_code = $order_wrapper->commerce_order_total->currency_code->value();
-  $transaction->status = COMMERCE_PAYMENT_STATUS_PENDING;
-
-  commerce_payment_transaction_save($transaction);
+  if ($use_split && count($order_wrapper->commerce_line_items->value()) > 1) {
+    $count = 1;
+    $split_payments = array();
+    $commerce_transactions = array();
+    foreach ($order_wrapper->commerce_line_items as $line_item_wrapper) {
+      $transaction = commerce_payment_transaction_new('commerce_dibs', $order->order_id);
+      $transaction->instance_id = $payment_method['instance_id'];
+      $transaction->amount = $line_item_wrapper->commerce_total->amount->value();
+      $transaction->currency_code = $order_wrapper->commerce_order_total->currency_code->value();
+      $transaction->status = COMMERCE_PAYMENT_STATUS_PENDING;
+      $transaction->payload = array('delta' => $count);
+      commerce_payment_transaction_save($transaction);
+      $split_payments[] = commerce_currency_amount_to_decimal($transaction->amount, $transaction->currency_code);
+      $commerce_transactions[] = $transaction;
+      $count += 1;
+    }
+  }
+  else {
+    $use_split = FALSE;
+    $transaction = commerce_payment_transaction_new('commerce_dibs', $order->order_id);
+    $transaction->instance_id = $payment_method['instance_id'];
+    $transaction->amount = $order_wrapper->commerce_order_total->amount->value();
+    $transaction->currency_code = $order_wrapper->commerce_order_total->currency_code->value();
+    $transaction->status = COMMERCE_PAYMENT_STATUS_PENDING;
+    commerce_payment_transaction_save($transaction);
+  }
 
   /**
   * Specifying array with payment info.
@@ -137,19 +179,35 @@ function commerce_dibs_redirect_form($form, &$form_state, $order, $payment_metho
   $data = array(
     'api_module'          => 'commerce_dibs',
     'api_delta'           => 'commerce_dibs',
-    'payment_price'       => commerce_currency_amount_to_decimal($transaction->amount, $transaction->currency_code),
+    'payment_price'       => commerce_currency_amount_to_decimal($order_wrapper->commerce_order_total->amount->value(), $order_wrapper->commerce_order_total->currency_code->value()),
     'payment_currency'    => $currency_info['numeric_code'],
     'payment_order_id'    => '',
     'params'              => array(
                                    'commerce_order_id' => $order->order_id,
-                                   'commerce_transaction_id' => $transaction->transaction_id,
                                    'payment_redirect_key' => $order->data['payment_redirect_key'],
                                    ),
   );
 
+  if ($use_split) {
+    $data['params']['split_payment_price'] = $split_payments;
+    $data['split_payments'] = count($split_payments);
+  }
+
   // Prepare the DIBS payment
   $hash = dibs_payment_prepare($data, FALSE);
   $dibs_transaction = dibs_transaction_hash_load($hash);
+
+  // Update the commerce transaction with the dibs tid.
+  if ($use_split) {
+    foreach ($commerce_transactions as $transaction) {
+      $transaction->remote_id = $dibs_transaction['tid'];
+      commerce_payment_transaction_save($transaction);
+    }
+  }
+  else {
+    $transaction->remote_id = $dibs_transaction['tid'];
+    commerce_payment_transaction_save($transaction);
+  }
   $settings = dibs_load_settings('commerce_dibs', 'commerce_dibs');
   $settings['auto_submit'] = 1;
 
