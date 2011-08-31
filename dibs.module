@@ -406,6 +406,17 @@ function dibs_transaction_load($key = NULL, $op = 'tid') {
     $transaction['order_info_long'] = unserialize($transaction['order_info_long']);
     $transaction['order_price_info'] = unserialize($transaction['order_price_info']);
     $transaction['params'] = !empty($transaction['params']) ? unserialize($transaction['params']) : array();
+    if ($transaction['split_payments'] > 1) {
+      $result = db_select('dibs_split_payments')
+        ->fields('dibs_split_payments', array('payment_transaction_id', 'delta'))
+        ->condition('tid', $transaction['tid'])
+        ->execute();
+      $payment_ids = array();
+      foreach ($result as $row) {
+        $payment_ids[$row->delta] = $row->payment_transaction_id;
+      }
+      $transaction['dibs_split_payments'] = $payment_ids;
+    }
     return $transaction;
   }
   else {
@@ -495,6 +506,7 @@ function dibs_payment_prepare($data, $redirect = TRUE) {
     'customer_country' => '',
     'customer_email' => !empty($user->mail) ? $user->mail : '',
     'customer_phone' => '',
+    'split_payments' => 1,
     'params' => array(),
   );
 
@@ -517,6 +529,7 @@ function dibs_payment_prepare($data, $redirect = TRUE) {
     'payment_status' => 0,
     'payment_currency' => !empty($data['payment_currency']) ? $data['payment_currency'] : $settings['general']['currency'],
     'payment_price' => $data['payment_price'],
+    'split_payments' => $data['split_payments'],
     'payment_transaction_type' => $data['payment_transaction_type'],
     'payment_transaction_id' => NULL,
     'customer_uid' => $data['customer_uid'],

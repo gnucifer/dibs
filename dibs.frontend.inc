@@ -68,16 +68,35 @@ function dibs_frontend_redirect_form($form, &$form_state = array(), $settings, $
     $data['payment_order_id'] .= '-' . $data['payment_retry_count'];
   }
 
+  $split = !empty($data['params']['split_payment_price']) ? count($data['params']['split_payment_price']) : 1;
+
   // Creating form fields
   // Required fields
   $form['merchant'] = array(
     '#type' => 'hidden',
     '#value' => $settings['general']['merchant'],
   );
-  $form['amount'] = array(
-    '#type' => 'hidden',
-    '#value' => $data['payment_price'] * 100,
-  );
+  // Handle split payments.
+  if ($split == 1) {
+    $form['amount'] = array(
+      '#type' => 'hidden',
+      '#value' => $data['payment_price'] * 100,
+    );
+  }
+  else {
+    $form['split'] = array(
+      '#type' => 'hidden',
+      '#value' => $split,
+    );
+    $count = 1;
+    foreach ($data['params']['split_payment_price'] as $payment_price) {
+      $form['amount' . $count] = array(
+        '#type' => 'hidden',
+        '#value' => $payment_price * 100,
+      );
+      $count += 1;
+    }
+  }
   $form['currency'] = array(
     '#type' => 'hidden',
     '#value' => !empty($data['payment_currency']) ? $data['payment_currency'] : $settings['general']['currency'],
@@ -217,7 +236,7 @@ function dibs_frontend_redirect_form($form, &$form_state = array(), $settings, $
   // Additional form fields
   $form['submit'] = array('#type' => 'submit', '#value' => t('Continue to DIBS payment'));
   if (!empty($settings['auto_submit'])) {
-    $form['submit']['#attached']['js'][] = drupal_get_path('module', 'dibs') . '/dibs.auto_submit.js';
+    //$form['submit']['#attached']['js'][] = drupal_get_path('module', 'dibs') . '/dibs.auto_submit.js';
   }
 
   // Executing the hook_dibsapi_form_alter
@@ -335,28 +354,83 @@ function dibs_frontend_cancel_form_submit($form, &$form_state) {
 }
 
 /**
+ * Utility function to check if the $_REQUEST array has the needed transact
+ * keys to perform validation.
+ *
+ * @param $request
+ *    The $_REQUEST array
+ * @param $split
+ *    The number of payments the order is split into.
+ *
+ * @return boolean if the request is valid.
+ */
+function dibs_frontend_validate_transact($request, $split = 1) {
+  if ($split == 1) {
+    return isset($request['transact']);
+  }
+  foreach (range(1, $split) as $key) {
+    if (!isset($request['transact' . $key])) {
+      return FALSE;
+    }
+  }
+  return TRUE;
+}
+
+/**
  * DIBS payment ok callback
  *
  * @param array $transaction
  */
 function dibs_frontend_dibs_callback_ok($transaction) {
-  if (isset($_REQUEST['transact'])) {
-    $transact = $_REQUEST['transact'];
+  $split = $transaction['split_payments'];
+  if (dibs_frontend_validate_transact($_REQUEST, $split)) {
     $authkey = isset($_REQUEST['authkey']) ? $_REQUEST['authkey'] : '';
     $paytype = isset($_REQUEST['paytype']) ? $_REQUEST['paytype'] : '';
+    if ($split == 1) {
+      $transact = $_REQUEST['transact'];
+      $transact_key = 'transact='. $transact;
+    }
+    else {
+      $transact = '';
+      $transact_a = array();
+      $transact_key = '';
+      foreach (range(1, $split) as $key) {
+        $transact_a[$key] = $_REQUEST['transact' . $key];
+        if (empty($transact_key)) {
+          $transact_key .= 'transact1=' . $_REQUEST['transact' . $key];
+        }
+        else {
+          $transact_key .= '&transact' . $key . '=' . $_REQUEST['transact' . $key];
+        }
+      }
+    }
     if (!empty($transaction)) {
       $settings = dibs_load_settings($transaction['api_module'], $transaction['api_delta']);
-      $md5_key = md5($settings['general']['md5_key2'] . md5($settings['general']['md5_key1'] . 'transact='. $transact .'&amount='. ($data['payment_price'] * 100) .'&currency='. $settings['general']['currency']));
+      $md5_key = md5($settings['general']['md5_key2'] . md5($settings['general']['md5_key1'] . $transact_key .'&amount='. ($transaction['payment_price'] * 100) .'&currency='. $transaction['payment_currency']));
       if ($md5_key == $authkey || empty($settings['md5'])) {
         // Updating transaction record with payment transaction id
+        $update = array(
+          'payment_status' => 1,
+          'payment_type' => $paytype,
+        );
+        if ($split == 1) {
+          $update['payment_transaction_id'] = $transact;
+        }
         $updated = db_update('dibs_transactions')
-          ->fields(array(
-            'payment_transaction_id' => $transact,
-            'payment_status' => 1,
-            'payment_type' => $paytype,
-          ))
+          ->fields($update)
           ->condition('tid', $transaction['tid'])
           ->execute();
+        if ($split > 1) {
+          foreach ($transact_a as $delta => $payment_transaction_id) {
+            db_insert('dibs_split_payments')
+              ->fields(array(
+                'tid' => $transaction['tid'],
+                'payment_transaction_id' => $payment_transaction_id,
+                'delta' => $delta,
+              ))
+              ->execute();
+          }
+        }
 
         if ($updated) {
           watchdog('dibs', 'Transaction #@tid validated as OK.', array(
