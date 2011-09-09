@@ -236,7 +236,7 @@ function dibs_frontend_redirect_form($form, &$form_state = array(), $settings, $
   // Additional form fields
   $form['submit'] = array('#type' => 'submit', '#value' => t('Continue to DIBS payment'));
   if (!empty($settings['auto_submit'])) {
-    //$form['submit']['#attached']['js'][] = drupal_get_path('module', 'dibs') . '/dibs.auto_submit.js';
+    $form['submit']['#attached']['js'][] = drupal_get_path('module', 'dibs') . '/dibs.auto_submit.js';
   }
 
   // Executing the hook_dibsapi_form_alter
