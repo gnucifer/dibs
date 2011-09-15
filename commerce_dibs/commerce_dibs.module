@@ -131,7 +131,7 @@ function commerce_dibs_redirect_form($form, &$form_state, $order, $payment_metho
       $transaction->amount = $line_item_wrapper->commerce_total->amount->value();
       $transaction->currency_code = $order_wrapper->commerce_order_total->currency_code->value();
       $transaction->status = COMMERCE_PAYMENT_STATUS_PENDING;
-      $transaction->payload = array('delta' => $count);
+      $transaction->payload = array('delta' => $count, 'commerce_line_item_id' => $line_item_wrapper->line_item_id->value());
       commerce_payment_transaction_save($transaction);
       $split_payments[] = commerce_currency_amount_to_decimal($transaction->amount, $transaction->currency_code);
       $commerce_transactions[] = $transaction;
