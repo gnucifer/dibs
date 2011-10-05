@@ -20,7 +20,6 @@ function dibs_install() {
       'order_id_suffix' => '',
     ))
     ->execute();
-
 }
 
 /**
@@ -432,5 +431,15 @@ function dibs_update_7000(&$sandbox) {
       ),
     ),
     'primary key' => array('tid', 'payment_transaction_id'),
+  ));
+}
+
+/**
+ * Add column for storing the payment fee.
+ */
+function dibs_update_7001(&$sandbox) {
+  db_add_field('dibs_transactions', 'payment_fee', array(
+    'type' => 'float',
+    'description' => t('The fee for the transaction'),
   ));
 }
