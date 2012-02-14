@@ -130,6 +130,10 @@ function dibs_schema() {
         'length' => 10,
         'description' => t('The payment type the user choose in the payment window.'),
       ),
+      'payment_fee', array(
+        'type' => 'float',
+        'description' => t('The fee for the transaction'),
+      ),
       'payment_transaction_type' => array(
         'type' => 'varchar',
         'length' => 10,
