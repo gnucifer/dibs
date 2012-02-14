@@ -295,6 +295,42 @@ function dibs_admin_settings_form($form, &$form_state, $module = NULL, $delta = 
     '#description' => t('Suffix used after the order ID value, when the payment is sent to DIBS. Using the prefix and/or suffix makes it easier to control that the order ID is unique when sent to DIBS. Characters allowed: A-z0-9-_'),
   );
 
+  // Custom URL callbacks
+  $form['callbacks'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Callback URLs'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+    '#tree' => TRUE,
+  );
+  $form['callbacks']['accepturl'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Accept URL'),
+    '#maxlength' => 255,
+    '#legnth' => 50,
+    '#required' => FALSE,
+    '#default_value' => dibs_get_settings_value($module, $delta, 'callbacks', 'accepturl', 'payment/dibs/accept'),
+    '#description' => t('The URL that DIBS should call after a transacation has been accepted.'),
+  );
+  $form['callbacks']['cancelurl'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Cancel URL'),
+    '#maxlength' => 255,
+    '#legnth' => 50,
+    '#required' => FALSE,
+    '#default_value' => dibs_get_settings_value($module, $delta, 'callbacks', 'cancelurl', 'payment/dibs/cancel'),
+    '#description' => t('The URL that DIBS should call after a transaction has been canceled by the user.'),
+  );
+  $form['callbacks']['callbackok'] = array(
+    '#type' => 'textfield',
+    '#title' => t('OK URL'),
+    '#maxlength' => 255,
+    '#legnth' => 50,
+    '#required' => FALSE,
+    '#default_value' => dibs_get_settings_value($module, $delta, 'callbacks', 'callbackok', 'payment/dibs/callbackok'),
+    '#description' => t('The URL that DIBS should call to validate that a transaction is OK.'),
+  );
+
   // Advanced settings
   $form['advanced'] = array(
     '#type' => 'fieldset',
@@ -399,6 +435,7 @@ function dibs_admin_settings_form_submit($form, &$form_state) {
   $flexwindow     = $form_state['values']['flexwindow'];
   $orderid        = $form_state['values']['orderid'];
   $advanced       = $form_state['values']['advanced'];
+  $callbacks      = $form_state['values']['callbacks'];
 
   // Checking if the module and delta exists
   $info = module_invoke($module, 'dibsapi', 'info', $delta);
@@ -412,7 +449,8 @@ function dibs_admin_settings_form_submit($form, &$form_state) {
     'general' => $general,
     'paymentwindow' => $paymentwindow,
     'flexwindow' => $flexwindow,
-    'advanced' => $advanced
+    'advanced' => $advanced,
+    'callbacks' => $callbacks,
   );
   variable_set('dibs_settings_' . $module . '_' . $delta, $settings);
 

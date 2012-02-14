@@ -115,15 +115,15 @@ function dibs_frontend_redirect_form($form, &$form_state = array(), $settings, $
   );
   $form['accepturl'] = array(
     '#type' => 'hidden',
-    '#value' => url('payment/dibs/accept/' . $data['api_hash'], array('absolute' => TRUE)),
+    '#value' => url($settings['callbacks']['accepturl'] . '/' . $data['api_hash'], array('absolute' => TRUE)),
   );
   $form['cancelurl'] = array(
     '#type' => 'hidden',
-    '#value' => url('payment/dibs/cancel/' . $data['api_hash'], array('absolute' => TRUE)),
+    '#value' => url($settings['callbacks']['cancelurl'] . '/' . $data['api_hash'], array('absolute' => TRUE)),
   );
   $form['callbackurl'] = array(
     '#type' => 'hidden',
-    '#value' => url('payment/dibs/callbackok/' . $data['api_hash'], array('absolute' => TRUE)),
+    '#value' => url($settings['callbacks']['callbackok'] . '/' . $data['api_hash'], array('absolute' => TRUE)),
   );
   $form['windowtype'] = array(
     '#type' => 'hidden',
