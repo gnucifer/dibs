@@ -47,7 +47,7 @@ function dibs_frontend_redirect_page($transaction) {
   // info sent to DIBS be shown with wrong characters in the payment window and in their
   // administration system.
   if ($settings['general']['type'] == 'pay') {
-    $form = str_replace('accept-charset="UTF-8"', 'accept-charset="ISO-8859-1"', $form);
+    $form['#attributes']['accept-charset'] = 'ISO-8859-1';
   }
 
   return theme('dibs_redirect_page', array('form' => $form, 'settings' => $settings, 'transaction' => $transaction));
