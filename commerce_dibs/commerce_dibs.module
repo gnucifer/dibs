@@ -95,6 +95,23 @@ function commerce_dibs_commerce_payment_method_info() {
 }
 
 /**
+ * Implements hook_commerce_payment_transaction_status_info().
+ */
+function commerce_dibs_commerce_payment_transaction_status_info() {
+  // Since we use COMMERCE_CREDIT_AUTH_ONLY for decerning that a payment has
+  // been autorized. We need to add that for the payment listing at orders.
+  return array(
+    COMMERCE_CREDIT_AUTH_ONLY => array(
+      'status' => COMMERCE_PAYMENT_STATUS_PENDING,
+      'title' => t('Authorize'),
+      'icon' => drupal_get_path('module', 'commerce_dibs') . '/auth-icon.png',
+      'total' => FALSE,
+    ),
+  );
+}
+
+
+/**
  * Payment method callback: settings form.
  */
 function commerce_dibs_settings_form($settings = NULL) {
