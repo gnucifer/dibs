@@ -7,6 +7,7 @@
 // if settings are missing for another implementation
 define('DIBS_DEFAULT_MODULE', 'dibs');
 define('DIBS_DEFAULT_DELTA',  'default');
+define('DIBS_CAPTURE_URL', 'https://payment.architrade.com/cgi-bin/capture.cgi');
 
 /**
  * @file
@@ -694,4 +695,80 @@ function template_preprocess_dibs_accept_page(&$variables) {
   $transaction = $variables['transaction'];
   $variables['template_files'][] = 'dibs-accept-page-' . $transaction['api_module'];
   $variables['template_files'][] = 'dibs-accept-page-' . $transaction['api_module'] . '-' . $transaction['api_delta'];
+}
+
+/**
+ * DIBS API function to capture a payment at DIBS.
+ *
+ * @param $api_module
+ *    The api module that performed the transaction.
+ * @param $api_delta
+ *    The delta for the api module that performed the transaction.
+ * @param $transaction
+ *    The DIBS transaction id for the transaction to capture.
+ *
+ * @return Array with info about how the capture when 'status' key is true on
+ *    successful capture.
+ */
+function dibs_capture_transaction($api_module, $api_delta, $transaction) {
+  $payment_data = db_query("SELECT payment_order_id AS orderid, payment_price AS amount FROM {dibs_transactions} WHERE payment_transaction_id = :transaction", array(':transaction' => $transaction))->fetch();
+  if (empty($payment_data->orderid) || empty($payment_data->amount)) {
+    return array(
+      'status' => FALSE,
+      'code' => 'Missing transaction',
+      'data' => 'Missing transaction in drupal db and could not get orderid or amount to capture',
+    );
+  }
+  $settings = dibs_load_settings($api_module, $api_delta);
+  $data = array(
+    'textreply' => 'true',
+    'fullreply' => 'true',
+    'force' => 'true',
+    'transact' => $transaction,
+    'orderid' => $payment_data->orderid,
+    'amount' => $payment_data->amount * 100,
+  );
+  $data['merchant'] = $settings['general']['merchant'];
+  if ($settings['general']['account']) {
+    $data['account'] = $settings['general']['account'];
+  }
+  if ($settings['general']['md5']) {
+    $data['md5key'] = md5($settings['general']['md5_key2'] . md5($settings['general']['md5_key1'] . 'merchant=' . $data['merchant'] . '&orderid=' . $data['orderid'] . '&transact=' . $data['transact'] . '&amount=' . $data['amount']));
+  }
+  $response = drupal_http_request(url(DIBS_CAPTURE_URL, array('query' => $data, 'absolute' => TRUE)));
+  $result = array();
+  if (trim($response->data) == 'MD5 checksum is not correct') {
+    $result['status'] = FALSE;
+    $result['code'] = 'MD5';
+    $result['data'] = $response->data;
+    watchdog('dibs', "MD5 key calculated for capture did not match for transaction @transaction. MD5 key calculated to @md5." , array(
+      '@transaction' => $transaction,
+      '@md5' => $data['md5key'],
+    ), WATCHDOG_CRITICAL);
+  }
+  elseif (strpos($response->data, 'status=ACCEPTED') !== FALSE) {
+    $result['status'] = TRUE;
+    watchdog('dibs', "Transaction @transaction has been successfully been captured at DIBS." , array(
+      '@transaction' => $transaction,
+    ), WATCHDOG_INFO);
+  }
+  elseif (strpos($response->data, 'status=DECLINED') !== FALSE) {
+    $result['status'] = FALSE;
+    $result['code'] = 'Declined';
+    $result['data'] = $response->data;
+    watchdog('dibs', "DIBS declined to capture payment with transaction id @transaction response: @response." , array(
+      '@transaction' => $transaction,
+      '@response' => $response->data,
+    ), WATCHDOG_CRITICAL);
+  }
+  else {
+    $result['status'] = FALSE;
+    $result['code'] = 'Unknown';
+    $result['data'] = $response->data;
+    watchdog('dibs', "Unknown error when trying to capture DIBS payment with transaction id @transaction response: @response." , array(
+      '@transaction' => $transaction,
+      '@response' => $response->data,
+    ), WATCHDOG_CRITICAL);
+  }
+  return $result;
 }
