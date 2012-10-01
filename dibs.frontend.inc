@@ -67,8 +67,9 @@ function dibs_frontend_redirect_form($form, &$form_state = array(), $settings, $
   if (isset($data['payment_retry_count']) && $data['payment_retry_count']) {
     $data['payment_order_id'] .= '-' . $data['payment_retry_count'];
   }
-
+  
   $split = !empty($data['params']['split_payment_price']) ? count($data['params']['split_payment_price']) : 1;
+  $subunit = !empty($data['params']['disable_subunit_calc']) ? 1 : 100;
 
   // Creating form fields
   // Required fields
@@ -80,7 +81,7 @@ function dibs_frontend_redirect_form($form, &$form_state = array(), $settings, $
   if ($split == 1) {
     $form['amount'] = array(
       '#type' => 'hidden',
-      '#value' => $data['payment_price'] * 100,
+      '#value' => $data['payment_price'] * $subunit,
     );
   }
   else {
@@ -92,7 +93,7 @@ function dibs_frontend_redirect_form($form, &$form_state = array(), $settings, $
     foreach ($data['params']['split_payment_price'] as $payment_price) {
       $form['amount' . $count] = array(
         '#type' => 'hidden',
-        '#value' => $payment_price * 100,
+        '#value' => $payment_price * $subunit,
       );
       $count += 1;
     }
