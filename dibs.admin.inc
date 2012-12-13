@@ -102,14 +102,19 @@ function dibs_admin_settings_form($form, &$form_state, $module = NULL, $delta = 
     '#default_value' => dibs_get_settings_value($module, $delta, 'general', 'test_mode', ''),
     '#description' => t('Is the gateway running in test mode'),
   );
+  //TODO: fix rest of default values
+  $options = $default ? array() : array('' => t('Default'));
+  $options += array(DIBS_PAYMENT_WINDOW => t('Pay window'), DIBS_FLEXWIN => t('Flex window'));
+
   $form['general']['type'] = array(
     '#type' => 'select',
     '#title' => t('Window type'),
     '#required' => $default,
-    '#options' => array('' => '', 'pay' => t('Pay window'), 'flex' => t('Flex window')),
-    '#default_value' => dibs_get_settings_value($module, $delta, 'general', 'type', ($default ? 1 : '')),
+    '#options' => $options,
+    '#default_value' => dibs_get_settings_value($module, $delta, 'general', 'type', $default ? DIBS_PAYMENT_WINDOW : ''),
     '#description' => t('If enabled, DIBS will make some extra checks on the sended data, to be sure that no one manipulated it. If enabled should the keys below be filled in!'),
   );
+
   $form['general']['retry_handling'] = array(
     '#type' => 'select',
     '#title' => t('Order id handling after cancel'),
@@ -117,6 +122,23 @@ function dibs_admin_settings_form($form, &$form_state, $module = NULL, $delta = 
     '#default_value' => dibs_get_settings_value($module, $delta, 'general', 'retry_handling', ($default ? 'new_order_id' : '')),
     '#description' => t('How the order id should be handled when the user retries a cancelled payment. Some card providers (edankort) require a new order ID after cancellation.'),
   );
+  $form['general']['hmac'] = array(
+    '#type' => 'select',
+    '#title' => t('Perform HMAC control'),
+    '#options' => array('' => '', 0 => t('No'), 1 => t('Yes')),
+    '#default_value' => dibs_get_settings_value($module, $delta, 'general', 'hmac', ($default ? 1 : '')),
+    '#description' => t('If enabled, DIBS will make some extra checks on the sended data, to be sure that no one manipulated it. If enabled should the keys below be filled in!'),
+  );
+  $form['general']['hmac_key'] = array(
+    '#type' => 'textarea',
+    '#resizable' => FALSE,
+    '#rows' => 2,
+    '#title' => t('HMAC key'),
+    '#required' => FALSE,
+    '#default_value' => dibs_get_settings_value($module, $delta, 'general', 'hmac_key', ''),
+    '#description' => t('HMAC key - used if "Perform HMAC control" is enabled.'),
+  );
+  
   $form['general']['md5'] = array(
     '#type' => 'select',
     '#title' => t('Perform MD5 control'),
@@ -140,6 +162,7 @@ function dibs_admin_settings_form($form, &$form_state, $module = NULL, $delta = 
     '#default_value' => dibs_get_settings_value($module, $delta, 'general', 'md5_key2', ''),
     '#description' => t('MD5 key 2 - used if "Perform MD5 control" is enabled.'),
   );
+
   $form['general']['lang'] = array(
     '#type' => 'select',
     '#title' => t('Language'),
@@ -395,7 +418,7 @@ function dibs_admin_settings_form_validate($form, &$form_state) {
   $default = dibs_is_default($module, $delta);
 
   // Checking if keys are filled in when MD5 check is enabled
-  if ($form_state['values']['general']['md5'] == 1) {
+  if ($form_state['values']['general']['md5']) {
     if (empty($form_state['values']['general']['md5_key1'])) {
       form_set_error('general][md5_key1', t('Please, fill in the missing key, or disable "Perform MD5 control". The MD5 keys can be found in the DIBS administration.'));
     }
@@ -404,6 +427,13 @@ function dibs_admin_settings_form_validate($form, &$form_state) {
     }
   }
 
+  // Checking if key is filled in when HMAC check is enabled
+  if ($form_state['values']['general']['hmac']) {
+    if (empty($form_state['values']['general']['hmac_key'])) {
+      form_set_error('general][hmac_key', t('Please, fill in the missing key, or disable "Perform HMAC control". The HMAC key can be found in the DIBS administration.'));
+    }
+  }
+  
   // Checking order ID settings
   if ($form_state['values']['orderid']['order_id'] == '') {
     form_set_error('orderid][order_id', t('Please, fill in the next order ID.'));

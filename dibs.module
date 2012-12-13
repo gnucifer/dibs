@@ -1,4 +1,5 @@
 <?php
+//TODO: implement transactoins etc as entities using entity api, generate admin ui etc
 
 /**
  * Defining some constants
@@ -8,20 +9,120 @@
 define('DIBS_DEFAULT_MODULE', 'dibs');
 define('DIBS_DEFAULT_DELTA',  'default');
 define('DIBS_CAPTURE_URL', 'https://payment.architrade.com/cgi-bin/capture.cgi');
+define('DIBS_TRANSSTATUS_URL', 'http://payment.architrade.com/transstatus.pml');
+
+define('DIBS_PAYMENT_WINDOW', 'pay');
+define('DIBS_FLEXWIN', 'flex');
+
+define('DIBS_PAYMENT_WINDOW_URL', 'https://sat1.dibspayment.com/dibspaymentwindow/entrypoint'); //According to: http://tech.dibs.dk/integration_methods/dibs_payment_window/parameters/
+define('DIBS_FLEXWIN_URL', 'https://payment.architrade.com/paymentweb/start.action'); //According to: http://tech.dibs.dk/integration_methods/flexwin/flexwin_introduction/
+
+define('DIBS_MAXIMUM_ORDER_LINES', 9); //According to: http://tech.dibspayment.com/dibs_api/other_features/order_information_in_dibs/
 
 /**
  * @file
  * Handle DIBS payment integration
  */
 
+define('DIBS_TRANSACTION_UNKNOWN_STATUS', -1);
+define('DIBS_TRANSACTION_INSERTED', 0);
+define('DIBS_TRANSACTION_DECLINED', 1);
+define('DIBS_TRANSACTION_AUTHORIZATION_APPROVED', 2);
+define('DIBS_TRANSACTION_CAPTURE_SENT', 3);
+define('DIBS_TRANSACTION_CAPTURE_DECLINED', 4);
+define('DIBS_TRANSACTION_CAPTURE_COMPLETED', 5);
+define('DIBS_TRANSACTION_AUTHORIZATION_DELETED', 6);
+define('DIBS_TRANSACTION_CAPTURE_BALANCED', 7);
+define('DIBS_TRANSACTION_PARTIALLY_REFUNDED_AND_BALANCED', 8);
+define('DIBS_TRANSACTION_REFUND_SENT', 9);
+define('DIBS_TRANSACTION_REFUND_DECLINED', 10);
+define('DIBS_TRANSACTION_REFUND_COMPLETED', 11);
+define('DIBS_TRANSACTION_CAPTURE_PENDING', 12);
+define('DIBS_TRANSACTION_TICKET_TRANSACTION', 13);
+define('DIBS_TRANSACTION_DELETED_TICKET_TRANSACTION', 14);
+define('DIBS_TRANSACTION_REFUND_PENDING', 15);
+define('DIBS_TRANSACTION_AWAITING_SHOP_APPROVAL', 16);
+define('DIBS_TRANSACTION_DECLINED_BY_DIBS', 17);
+define('DIBS_TRANSACTION_MULTICAP_TRANSACTION_OPEN', 18);
+define('DIBS_TRANSACTION_MULTICAP_TRANSACTION_CLOSED', 19);
+
+function dibs_transaction_status_description($code) {
+  //TODO: or switch avoiding unnecessary calls to t()?
+  //TODO: capitalize
+  $messages = array(
+    DIBS_TRANSACTION_INSERTED => t('transaction inserted (not approved)'),
+    DIBS_TRANSACTION_DECLINED => t('declined'),
+    DIBS_TRANSACTION_AUTHORIZATION_APPROVED => t('authorization approved'),
+    DIBS_TRANSACTION_CAPTURE_SENT => t('capture sent to acquirer'),
+    DIBS_TRANSACTION_CAPTURE_DECLINED => t('capture declined by acquirer'),
+    DIBS_TRANSACTION_CAPTURE_COMPLETED => t('capture completed'),
+    DIBS_TRANSACTION_AUTHORIZATION_DELETED => t('authorization deleted'),
+    DIBS_TRANSACTION_CAPTURE_BALANCED => t('capture balanced'),
+    DIBS_TRANSACTION_PARTIALLY_REFUNDED_AND_BALANCED => t('partially refunded and balanced'),
+    DIBS_TRANSACTION_REFUND_SENT => t('refund sent to acquirer'),
+    DIBS_TRANSACTION_REFUND_DECLINED => t('refund declined'),
+    DIBS_TRANSACTION_REFUND_COMPLETED => t('refund completed'),
+    DIBS_TRANSACTION_CAPTURE_PENDING => t('capture pending'), 
+    DIBS_TRANSACTION_TICKET_TRANSACTION => t('"ticket" transaction'),
+    DIBS_TRANSACTION_DELETED_TICKET_TRANSACTION => t('deleted "ticket" transaction'),
+    DIBS_TRANSACTION_REFUND_PENDING => t('refund pending'),
+    DIBS_TRANSACTION_AWAITING_SHOP_APPROVAL => t('waiting for shop approval'),
+    DIBS_TRANSACTION_DECLINED_BY_DIBS => t('declined by DIBS'),
+    DIBS_TRANSACTION_MULTICAP_TRANSACTION_OPEN => t('multicap transaction open'), 
+    DIBS_TRANSACTION_MULTICAP_TRANSACTION_CLOSED => t('multicap transaction closed'),
+  );
+  return $messages[$code];
+}
+
+function dibs_transaction_status_validate($code) {
+  //TODO: or switch avoiding unnecessary calls to t()?
+  //TODO: capitalize
+  return in_array(
+    $code,
+    array(
+      DIBS_TRANSACTION_INSERTED,
+      DIBS_TRANSACTION_DECLINED,
+      DIBS_TRANSACTION_AUTHORIZATION_APPROVED,
+      DIBS_TRANSACTION_CAPTURE_SENT,
+      DIBS_TRANSACTION_CAPTURE_DECLINED,
+      DIBS_TRANSACTION_CAPTURE_COMPLETED, 
+      DIBS_TRANSACTION_AUTHORIZATION_DELETED,
+      DIBS_TRANSACTION_CAPTURE_BALANCED,
+      DIBS_TRANSACTION_PARTIALLY_REFUNDED_AND_BALANCED,
+      DIBS_TRANSACTION_REFUND_SENT,
+      DIBS_TRANSACTION_REFUND_DECLINED,
+      DIBS_TRANSACTION_REFUND_COMPLETED,
+      DIBS_TRANSACTION_CAPTURE_PENDING,
+      DIBS_TRANSACTION_TICKET_TRANSACTION,
+      DIBS_TRANSACTION_DELETED_TICKET_TRANSACTION,
+      DIBS_TRANSACTION_REFUND_PENDING,
+      DIBS_TRANSACTION_AWAITING_SHOP_APPROVAL,
+      DIBS_TRANSACTION_DECLINED_BY_DIBS,
+      DIBS_TRANSACTION_MULTICAP_TRANSACTION_OPEN,
+      DIBS_TRANSACTION_MULTICAP_TRANSACTION_CLOSED,
+    )
+  );
+}
+
 /**
  * Implementation of hook_init().
  */
+//TODO: must use hook_boot do do this safely??
 function dibs_init() {
   // Disabling cache on DIBS pages
   if (arg(0) == 'payment' && arg(1) == 'dibs') {
     $GLOBALS['conf']['cache'] = FALSE;
   }
+}
+
+function dibs_hmac($data, $key) {
+  $key_as_string = array();
+  //Split as bytes in hex and convert to each byte to char
+  foreach (explode("\n", trim(chunk_split($key, 2, "\n"))) as $h) {
+    $key_as_string[] = chr(hexdec($h));
+  }
+  $key_as_string = implode('', $key_as_string);
+  return hash_hmac('sha256', $data, $key_as_string);
 }
 
 /**
@@ -51,7 +152,6 @@ function dibs_permission() {
     ),
   );
 }
-
 
 /**
  * Implementation of hook_theme().
@@ -564,6 +664,31 @@ function dibs_payment_prepare($data, $redirect = TRUE) {
   return $hash;
 }
 
+function dibs_order_line_data_validate($lines) {
+  if(is_array($lines)) {
+    foreach($lines as $r => $line) {
+      if(is_array($line)) {
+        foreach($line as $column) {
+          if(!is_scalar($column)) {
+            throw new Exception(t('Invalid order line format, column items must be scalar values, got !type.', array('!type' => gettype($column))));
+          }
+        }
+        if(isset($cols) && count($line) != $cols) {
+          throw new Exception(t('Invalid order line format, inconsistent number of column items.'));
+        }
+        $cols = count($line);
+      }
+      else {
+        throw new Exception(t('Invalid order line format, order line must be an array.'));
+      }
+    }
+  }
+  else {
+    throw new Exception(t('Invalid order line format, order lines must be an array.'));
+  }
+  return TRUE;
+}
+
 /**
  * Create the hidden order line fields from
  * the order_info_long array in the transaction.
@@ -572,33 +697,41 @@ function dibs_payment_prepare($data, $redirect = TRUE) {
  *
  * @return array $form
  */
-function dibs_create_order_line_fields($data) {
-  $form = array();
-  if (is_array($data)) {
-    if (is_array(current($data))) {
-      $i = 0;
-      foreach ($data as $line) {
-        $j = 1;
-        foreach ($line as $column) {
-          $form['ordline' . $i . '-' . $j] = array(
-            '#type' => 'hidden',
-            '#value' => $column
-          );
-          $j++;
-        }
-        $i++;
-      }
-      $form['ordlinesx'] = array(
-        '#type' => 'hidden',
-        '#value' => $i,
-      );
-      $form['ordlinesy'] = array(
-        '#type' => 'hidden',
-        '#value' => $j-1,
-      );
+//TODO: rename to order_line_data
+function dibs_create_order_line_data($lines, $payment_type) {
+  $data = array();
+  //Assert format
+  $cols = NULL;
+  dibs_order_line_data_validate($lines);
+ 
+  if((count(current($lines)) * count($lines)) > DIBS_MAXIMUM_ORDER_LINES) {
+    $max_lines = floor(DIBS_MAXIMUM_ORDER_LINES / $cols);
+    watchdog(
+      'dibs',
+      'Maximum order lines exceeded, order lines data will be truncated to !lines lines',
+      array('!lines' => $max_lines),
+      WATCHDOG_WARNING
+    );
+    $lines = array_slice($lines, 0, $max_lines);
+  }
+  foreach(array_values($lines) as $r => $line) {
+    foreach (array_values($line) as $c => $column) {
+      $data['ordline' . $r . '-' . ($c + 1)] = strval($column);
     }
   }
-  return $form;
+  //found no mention of these in documentation
+  /*
+  //TODO: valid?
+  $form['ordlinesx'] = array(
+    '#type' => 'hidden',
+    '#value' => $i,
+  );
+  $form['ordlinesy'] = array(
+    '#type' => 'hidden',
+    '#value' => $j-1,
+  );
+  */
+  return $data;
 }
 
 /**
@@ -609,26 +742,19 @@ function dibs_create_order_line_fields($data) {
  *
  * @return array $form
  */
-function dibs_create_price_line_fields($data) {
-  $form = array();
-  if (is_array($data)) {
-    $i = 1;
-    $keys = array();
-    foreach ($data as $key => $value) {
-      $field = 'priceinfo' . $i . '.' . drupal_ucfirst($key);
-      $keys[] = $field;
-      $form[$field] = array(
-        '#type' => 'hidden',
-        '#value' => $value
-      );
-      $i++;
-    }
-    $form['priceinfo_keys'] = array(
-      '#type' => 'hidden',
-      '#value' => implode(',', $keys),
-    );
+function dibs_create_price_line_data($lines) {
+  $data = array();
+  //TODO: validation
+  $r = 0;
+  //$keys = array();
+  foreach ($lines as $key => $value) {
+    $field = 'priceinfo' . ++$r . '.' . drupal_ucfirst($key);
+    //$keys[] = $field;
+    $data[$field] = $value;
   }
-  return $form;
+  //TODO: valid?
+  //$data['priceinfo_keys'] = implode(',', $keys);
+  return $data;
 }
 
 /**
@@ -639,29 +765,18 @@ function dibs_create_price_line_fields($data) {
  *
  * @return array $form
  */
-function dibs_create_delivery_line_fields($data) {
-  $form = array();
-  if (is_array($data)) {
-    $i = 1;
-    $keys = array();
-    foreach ($data as $key => $value) {
-      if (strpos($key, 'customer_') !== FALSE && !empty($value)) {
-        $key = str_replace('customer_', '', $key);
-        $field = 'delivery' . $i . '.' . drupal_ucfirst($key);
-        $keys[] = $field;
-        $form[$field] = array(
-          '#type' => 'hidden',
-          '#value' => $value
-        );
-        $i++;
-      }
-    }
-    $form['delivery_keys'] = array(
-      '#type' => 'hidden',
-      '#value' => implode(',', $keys),
-    );
+function dibs_create_delivery_line_data($lines) {
+  $data = array();
+  $r = 0;
+  //$keys = array();
+  foreach ($lines as $key => $value) {
+    $field = 'delivery' . ++$r . '.' . drupal_ucfirst($key);
+    //$keys[] = $field;
+    $data[$field] = $value;
   }
-  return $form;
+  //TODO: valid?
+  //$form['delivery_keys'] = implode(',', $keys);
+  return $data;
 }
 
 /**
@@ -697,6 +812,30 @@ function template_preprocess_dibs_accept_page(&$variables) {
   $variables['template_files'][] = 'dibs-accept-page-' . $transaction['api_module'] . '-' . $transaction['api_delta'];
 }
 
+
+function dibs_transaction_transaction_status($transaction) {
+  $settings = dibs_load_settings($transaction['api_module'], $transaction['api_delta']);
+  $params = array(
+    'merchant' => $settings['general']['merchant'],
+    'transact' => $transaction['payment_transaction_id'],
+  );
+  if(!empty($settings['general']['account'])){
+    $params['account'] = $settings['general']['account']; 
+  }
+  return dibs_transaction_status($params);
+}
+
+function dibs_transaction_status($params) {
+  $response = drupal_http_request(url(DIBS_TRANSSTATUS_URL, array('query' => $params)));
+  $result = trim($response->data);
+  if(ctype_digit($result)) {
+    $status_code = intval($result);
+    //TODO: watchdog if validation failed
+    return dibs_transaction_status_validate($status_code) ? $status_code : DIBS_TRANSACTION_UNKNOWN_STATUS;
+  }
+  return DIBS_TRANSACTION_UNKNOWN_STATUS;
+}
+
 /**
  * DIBS API function to capture a payment at DIBS.
  *
@@ -726,16 +865,21 @@ function dibs_capture_transaction($api_module, $api_delta, $transaction) {
     'force' => 'true',
     'transact' => $transaction,
     'orderid' => $payment_data->orderid,
-    'amount' => $payment_data->amount * 100,
+    'amount' => $payment_data->amount,
   );
   $data['merchant'] = $settings['general']['merchant'];
   if ($settings['general']['account']) {
     $data['account'] = $settings['general']['account'];
   }
   if ($settings['general']['md5']) {
-    $data['md5key'] = md5($settings['general']['md5_key2'] . md5($settings['general']['md5_key1'] . 'merchant=' . $data['merchant'] . '&orderid=' . $data['orderid'] . '&transact=' . $data['transact'] . '&amount=' . $data['amount']));
+    //TODO: general function for this
+    $hash_data = array();
+    foreach(array('merchant', 'orderid', 'transact', 'amount') as $key) {
+      $hash_data[$key] = $data[$key];
+    }
+    $data['authkey'] = md5($settings['general']['md5_key2'] . md5($settings['general']['md5_key1'] . dibs_hash_string($hash_data)));
   }
-  $response = drupal_http_request(url(DIBS_CAPTURE_URL, array('query' => $data, 'absolute' => TRUE)));
+  $response = drupal_http_request(url(DIBS_CAPTURE_URL, array('query' => $data)));
   $result = array();
   if (trim($response->data) == 'MD5 checksum is not correct') {
     $result['status'] = FALSE;

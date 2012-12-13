@@ -37,23 +37,11 @@ function commerce_dibs_dibsapi($op = 'info', $delta = NULL, &$transaction = NULL
       }
       break;
     case 'transaction_accept':
-      $commerce_transactions = commerce_payment_transaction_load_multiple(FALSE, array('remote_id' => $transaction['tid']));
-      $order = commerce_order_load($transaction['params']['commerce_order_id']);
 
-      if ($order && $commerce_transactions) {
-        foreach ($commerce_transactions as $commerce_transaction) {
-          if ($commerce_transaction->status !== COMMERCE_CREDIT_AUTH_ONLY) {
-            drupal_set_message(t('Unable to verify your payment, please try again.'), 'error');
-            drupal_goto('checkout/' . $order->order_id . '/payment/back/' . $transaction['params']['payment_redirect_key']);
-          }
-        }
-        drupal_goto('checkout/' . $order->order_id . '/payment/return/' . $transaction['params']['payment_redirect_key']);
-      }
-      else {
-        // TODO: Set error message.
-      }
-      break;
-    case 'transaction_callback':
+
+      watchdog('dibs_commerce', 'transaction accecpt: ' . $transaction['tid'], array(), WATCHDOG_DEBUG);
+
+
       $commerce_transactions = commerce_payment_transaction_load_multiple(FALSE, array('remote_id' => $transaction['tid']));
       // Update transaction(s).
       if ($commerce_transactions) {
@@ -74,6 +62,29 @@ function commerce_dibs_dibsapi($op = 'info', $delta = NULL, &$transaction = NULL
           }
         }
       }
+
+
+      $commerce_transactions = commerce_payment_transaction_load_multiple(FALSE, array('remote_id' => $transaction['tid']));
+      $order = commerce_order_load($transaction['params']['commerce_order_id']);
+
+      if ($order && $commerce_transactions) {
+        foreach ($commerce_transactions as $commerce_transaction) {
+          if ($commerce_transaction->status !== COMMERCE_CREDIT_AUTH_ONLY) {
+            watchdog('dibs_commerce', print_r($commerce_transaction, TRUE), array(), WATCHDOG_DEBUG);
+            drupal_set_message(t('Unable to verify your payment, please try again.'), 'error');
+            drupal_goto('checkout/' . $order->order_id . '/payment/back/' . $transaction['params']['payment_redirect_key']);
+          }
+        }
+        drupal_goto('checkout/' . $order->order_id . '/payment/return/' . $transaction['params']['payment_redirect_key']);
+      }
+      else {
+        // TODO: Set error message.
+      }
+      break;
+    case 'transaction_callback':
+
+      watchdog('dibs_commerce', 'transaction callback: ' . $transaction['tid'], array(), WATCHDOG_DEBUG);
+
       break;
   }
 }
@@ -87,7 +98,7 @@ function commerce_dibs_commerce_payment_method_info() {
   $payment_methods['commerce_dibs'] = array(
     'title' => t('DIBS'),
     'description' => t('Payment using the DIBS provider.'),
-    'display_title' => t('Credit card'),
+    'display_title' => t('DIBS Payment Services'),
     'offsite' => TRUE,
   );
 
@@ -150,7 +161,7 @@ function commerce_dibs_redirect_form($form, &$form_state, $order, $payment_metho
       $transaction->status = COMMERCE_PAYMENT_STATUS_PENDING;
       $transaction->payload = array('delta' => $count, 'commerce_line_item_id' => $line_item_wrapper->line_item_id->value());
       commerce_payment_transaction_save($transaction);
-      $split_payments[] = commerce_currency_amount_to_decimal($transaction->amount, $transaction->currency_code);
+      $split_payments[] = $transaction->amount;
       $commerce_transactions[] = $transaction;
       $count += 1;
     }
@@ -196,13 +207,13 @@ function commerce_dibs_redirect_form($form, &$form_state, $order, $payment_metho
   $data = array(
     'api_module'          => 'commerce_dibs',
     'api_delta'           => 'commerce_dibs',
-    'payment_price'       => commerce_currency_amount_to_decimal($order_wrapper->commerce_order_total->amount->value(), $order_wrapper->commerce_order_total->currency_code->value()),
+    'payment_price'       => $order_wrapper->commerce_order_total->amount->value(),
     'payment_currency'    => $currency_info['numeric_code'],
     'payment_order_id'    => '',
     'params'              => array(
-                                   'commerce_order_id' => $order->order_id,
-                                   'payment_redirect_key' => $order->data['payment_redirect_key'],
-                                   ),
+      'commerce_order_id' => $order->order_id,
+      'payment_redirect_key' => $order->data['payment_redirect_key'],
+    ),
   );
 
   if ($use_split) {

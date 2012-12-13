@@ -114,6 +114,12 @@ function dibs_schema() {
         'default' => 0,
         'description' => t('0 = payment not recieved, 1 = payment recieved'),
       ),
+      'payment_transaction_status' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'default' => -1,
+        'description' => t('The dibs transaction status'),
+      ),
       'payment_currency' => array(
         'type' => 'varchar',
         'length' => 5,
@@ -445,5 +451,17 @@ function dibs_update_7001(&$sandbox) {
   db_add_field('dibs_transactions', 'payment_fee', array(
     'type' => 'float',
     'description' => t('The fee for the transaction'),
+  ));
+}
+
+/**
+ * Add column for storing the dibs transaction status
+ */
+function dibs_update_7002(&$sandbox) {
+  db_add_field('dibs_transactions', 'payment_transaction_status', array(
+    'type' => 'int',
+    'size' => 'tiny',
+    'default' => -1,
+    'description' => t('The dibs transaction status'),
   ));
 }
