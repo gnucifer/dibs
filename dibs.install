@@ -128,7 +128,7 @@ function dibs_schema() {
         'description' => t('Currency code for the payment'),
       ),
       'payment_price' => array(
-        'type' => 'float',
+        'type' => 'int', //todo: update hook, convert current values
         'description' => t('The price paid'),
       ),
       'payment_type' => array(
@@ -137,7 +137,7 @@ function dibs_schema() {
         'description' => t('The payment type the user choose in the payment window.'),
       ),
       'payment_fee' => array(
-        'type' => 'float',
+        'type' => 'float', //@todo: change to int?
         'description' => t('The fee for the transaction'),
       ),
       'payment_transaction_type' => array(
