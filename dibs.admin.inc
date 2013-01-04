@@ -216,6 +216,9 @@ function dibs_admin_settings_form($form, &$form_state, $module = NULL, $delta = 
     '#collapsed' => TRUE,
     '#tree' => TRUE,
   );
+
+  _dibs_payment_types_element($form, 'paymentwindow', $module, $delta, DIBS_PAYMENT_WINDOW); 
+  
   $form['paymentwindow']['color'] = array(
     '#type' => 'select',
     '#title' => t('Color theme'),
@@ -238,6 +241,9 @@ function dibs_admin_settings_form($form, &$form_state, $module = NULL, $delta = 
     '#collapsed' => TRUE,
     '#tree' => TRUE,
   );
+
+  _dibs_payment_types_element($form, 'flexwindow', $module, $delta, DIBS_FLEXWIN); 
+
   $form['flexwindow']['color'] = array(
     '#type' => 'select',
     '#title' => t('Color theme'),
@@ -474,6 +480,28 @@ function dibs_admin_settings_form_submit($form, &$form_state) {
     exit;
   }
 
+  $paymentwindow['paytypes'] = array();
+  foreach(array_keys(dibs_paytypes_types(DIBS_PAYMENT_WINDOW)) as $key) {
+    $paymentwindow['payment_types'][$key]['types'] = array_filter($paymentwindow['payment_types'][$key]['types']);
+    if($paymentwindow['payment_types'][$key]['selection'] === 'select') {
+      $paymentwindow['paytypes'] = array_merge($paymentwindow['paytypes'], array_values($paymentwindow['payment_types'][$key]['types']));
+    }
+    elseif (!empty($paymentwindow['payment_types'][$key]['selection'])) {
+      $paymentwindow['paytypes'][] = $paymentwindow['payment_types'][$key]['selection'];
+    }
+  }
+
+  $flexwindow['paytypes'] = array();
+  foreach(array_keys(dibs_paytypes_types(DIBS_FLEXWIN)) as $key) {
+    $flexwindow['payment_types'][$key]['types'] = array_filter($flexwindow['payment_types'][$key]['types']);
+    if($flexwindow['payment_types'][$key]['selection'] === 'select') {
+      $flexwindow['paytypes'] = array_merge($flexwindow['paytypes'], array_values($flexwindow['payment_types'][$key]['types']));
+    }
+    elseif (!empty($flexwindow['payment_types'][$key]['selection'])) {
+      $flexwindow['paytypes'][] = $flexwindow['payment_types'][$key]['selection'];
+    }
+  }
+
   // Creating array with settings and saving it as a variable
   $settings = array(
     'general' => $general,
@@ -520,7 +548,241 @@ function dibs_admin_settings_form_submit($form, &$form_state) {
 
   drupal_get_messages();
   drupal_set_message(t('The settings are now saved.'));
-
+ 
   $form_state['redirect'] = 'admin/config/payment/dibs';
-  return;
+}
+
+function _dibs_payment_types_element(&$element, $element_name, $module, $delta, $paywin_type) {
+
+  //'#default_value' => dibs_get_settings_value($module, $delta, 'advanced', 'unqiue_order_id', ($default ? 1 : '')),
+  $settings = dibs_get_settings_value($module, $delta, $element_name, 'payment_types', array());
+
+  $element[$element_name]['payment_types'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Payment types'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+    //'#description' => 'TODO',
+  );
+
+  $element = &$element[$element_name]['payment_types'];
+
+  foreach(dibs_paytypes_types($paywin_type) as $type => $info) {
+    $element[$type] = array(
+      '#title' => $info['label'],
+      '#type' => 'fieldset',
+    );
+    $element[$type]['selection'] = array(
+      '#title' => t('Selection'),
+      '#type' => 'select',
+      '#options' => array(
+        '' => t('None'),
+        $info['select_all'] => t('All'),
+        'select' => t('Select'),
+      ),
+      '#default_value' => isset($settings[$type]['selection']) ? $settings[$type]['selection'] : '',
+    );
+    $selection_selector = 'select[name="' . $element_name . '[' . implode('][', array('payment_types', $type, 'selection')) . ']"]';
+
+    $element[$type]['types'] = array(
+      '#title' => t('Select types'),
+      '#type' => 'checkboxes',
+      '#states' => array(
+        'visible' => array(
+          $selection_selector => array('value' => 'select'),
+        ),
+      ),
+      '#options' => $info['types'],
+      '#default_value' => isset($settings[$type]['types']) ? $settings[$type]['types'] : NULL,
+    );
+  }
+}
+
+function dibs_paytypes_types($paywin_type) {
+  return array(
+    'cards' => array(
+      'label' => t('Cards'),
+      'types' => dibs_paytypes_cards($paywin_type),
+      'select_all' => 'ALL_CARDS',
+    ),
+    'netbanks' => array(
+      'label' => t('Netbanks'),
+      'types' => dibs_paytypes_netbanks($paywin_type),
+      'select_all' => 'ALL_NETBANKS',
+    ),
+    'invoices' => array(
+      'label' => t('Invoices'),
+      'types' => dibs_paytypes_invoices($paywin_type),
+      'select_all' => 'ALL_INVOICES',
+    ),
+  );
+}
+
+function dibs_paytypes_cards($paywin_type) {
+  switch($paywin_type) {
+    case DIBS_FLEXWIN:
+    case DIBS_PAYMENT_WINDOW:
+      return array(
+        'AAK' => t('Århus city kort'),
+        'ACCEPT' => t('Accept card'),
+        'ACK' => t('Albertslund Centrum Kundekort'),
+        'AKK' => t('Apollo-/Kuonikonto'),
+        'AMEX' => t('American Express'),
+        'AMEX(DK)' => t('!cardtype_description, parent cardtype: !parent_cardtype', array('!cardtype_description' => t('American Express (Danish card)'), '!parent_cardtype' => t('AMEX'))),
+        'AMEX(SE)' => t('!cardtype_description, parent cardtype: !parent_cardtype', array('!cardtype_description' => t('American Express (Swedishcard)'), '!parent_cardtype' => t('AMEX'))),
+        'BHBC' => t('Bauhaus Best card'),
+        'CCK' => t('Computer City Customer Card'),
+        'DAELLS' => t('Daells Bolighus Kundekort'),
+        'DIN' => t('Diners Club'),
+        'DIN(DK)' => t('!cardtype_description, parent cardtype: !parent_cardtype', array('!cardtype_description' => t('Diners Club (Danish card)'), '!parent_cardtype' => t('DIN'))),
+        'DK' => t('Dankort'),
+        'ELEC' => t('!cardtype_description, parent cardtype: !parent_cardtype', array('!cardtype_description' => t('VISA Electron'), '!parent_cardtype' => t('VISA'))),
+        'EWORLD' => t('Electronic World Credit Card'),
+        'FCC' => t('Ford Credit Card'),
+        'FCK' => t('Frederiksberg Centret Kundekort'),
+        'FFK' => t('Forbrugsforeningen Card'),
+        'FINX(SE)' => t('Finax (SE)'),
+        'FISC' => t('Fields Shoppingcard'),
+        'FLEGCARD' => t('Fleggard kort'),
+        'FSC' => t('Fisketorvet Shopping Card'),
+        'GIT' => t('Getitcard'),
+        'GSC' => t('Glostrup Shopping Card'),
+        'GRA' => t('Graphium'),
+        'HEME' => t('Hemtex faktura'),
+        'HEMP' => t('Hemtex personalkort'),
+        'HEMTX' => t('Hemtex clubkort'),
+        'HMK' => t('HM Konto (Hennes og Mauritz)'),
+        'HNYBORG' => t('Harald Nyborg'),
+        'HSC' => t('Hillerød Shopping Card'),
+        'HTX' => t('Hydro Texaco'),
+        'IBC' => t('Inspiration Best Card'),
+        'IKEA' => t('IKEA kort'),
+        'ISHBY' => t('Sparbank Vestkort'),
+        'JCB' => t('JCB (Japan Credit Bureau)'),
+        'JEM_FIX' => t('Jem&Fix Kundekort'),
+        'KAUPBK' => t('Kaupthing Bankkort'),
+        'LFBBK' => t('LänsförsäkringarBank Bankkort'),
+        'LIC(DK)' => t('Lærernes IndkøbsCentral (Denmark)'),
+        'LIC(SE)' => t('Lærernes IndkøbsCentral (Sweden)'),
+        'LOPLUS' => t('LO Plus Guldkort'),
+        'MC' => t('Mastercard'),
+        'MC(DK)' => t('!cardtype_description, parent cardtype: !parent_cardtype', array('!cardtype_description' => t('Mastercard (Danish card)'), '!parent_cardtype' => t('MC'))),
+        'MC(SE)' => t('!cardtype_description, parent cardtype: !parent_cardtype', array('!cardtype_description' => t('Mastercard (Swedish card)'), '!parent_cardtype' => t('MC'))),
+        'MC(YX)' => t('!cardtype_description, parent cardtype: !parent_cardtype', array('!cardtype_description' => t('YX Mastercard'), '!parent_cardtype' => t('MC'))),
+        'MEDM' => t('Medmera'),
+        'MERLIN' => t('Merlin Kreditkort'),
+        'MTRO' => t('Maestro'),
+        'MTRO(DK)' => t('!cardtype_description, parent cardtype: !parent_cardtype', array('!cardtype_description' => t('Maestro (DK)'), '!parent_cardtype' => t('MTRO'))),
+        'MTRO(UK)' => t('!cardtype_description, parent cardtype: !parent_cardtype', array('!cardtype_description' => t('Maestro (UK)'), '!parent_cardtype' => t('MTRO'))),
+        'MTRO(SOLO)' => t('!cardtype_description, parent cardtype: !parent_cardtype', array('!cardtype_description' => t('Solo'), '!parent_cardtype' => t('MTRO'))),
+        'MTRO(SE)' => t('!cardtype_description, parent cardtype: !parent_cardtype', array('!cardtype_description' => t('Maestro (SE)'), '!parent_cardtype' => t('MTRO'))),
+        'MYHC' => t('My Holiday Card'),
+        'NSBK' => t('Nordea Bankkort'),
+        'OESBK' => t('Östgöta EnskildaBankkort'),
+        'PayPal' => t('Paypal'),
+        'Q8SK' => t('Q8 ServiceKort'),
+        'REB' => t('Resurs Bank'),
+        'REMCARD' => t('Remember Card'),
+        'ROEDCEN' => t('Rødovre Centerkort'),
+        'S/T' => t('Spies/Tjæreborg'),
+        'SBSBK' => t('Skandiabanken Bankkort'),
+        'SEB_KOBK' => t('SEB Köpkort'),
+        'SEBSBK' => t('SEB Bankkort'),
+        'SHB' => t('HandelsbankenKöpkort'),
+        'SILV_ERHV' => t('Silvan Konto Erhverv'),
+        'SILV_PRIV' => t('Silvan Konto Privat'),
+        'STARTOUR' => t('Star Tour'),
+        'TLK' => t('Tæppeland'),
+        'TUBC' => t('Toys R Us - BestCard'),
+        'V-DK' => t('!cardtype_description, parent cardtype: !parent_cardtype', array('!cardtype_description' => t('VISA-Dankort'), '!parent_cardtype' => t('DK'))),
+        'VEKO' => t('VEKO Finans'),
+        'VISA' => t('VISA'),
+        'VISA(DK)' => t('!cardtype_description, parent cardtype: !parent_cardtype', array('!cardtype_description' => t('VISA (DK)'), '!parent_cardtype' => t('VISA'))),
+        'VISA(SE)' => t('!cardtype_description, parent cardtype: !parent_cardtype', array('!cardtype_description' => t('VISA (SE)'), '!parent_cardtype' => t('VISA'))),
+        'WOCO' => t('!cardtype_description, parent cardtype: !parent_cardtype', array('!cardtype_description' => t('Wonderful Copenhagen Card'), '!parent_cardtype' => t('VISA'))),
+      );
+    default:
+      throw new Exception();
+  }
+}
+
+function dibs_paytypes_netbanks($paywin_type) {
+  switch($paywin_type) {
+    case DIBS_FLEXWIN:
+      return _dibs_flexwin_paytypes_netbanks();
+
+    case DIBS_PAYMENT_WINDOW:
+      return _dibs_paymentwindow_paytypes_netbanks();
+
+    default:
+      throw new Exception();
+  }
+}
+
+function _dibs_flexwin_paytypes_netbanks() {
+  return array(
+    'AAL' => t('Ålandsbanken'),
+    'ABN' => t('ABN AMRO iDeal Payment'),
+    'AKTIA or AKT_A' => t('Aktia Web Payment'),
+    'BAX' => t('BankAxess'),
+    'CC' => t('CoinClick'),
+    'DNB' => t('Danske Netbetaling (Danske Bank)'),
+    'ECRED' => t('eCredit Payment'),
+    'EDK' => t('eDankort'),
+    'ELV' => t('Bank Einzug (eOLV)'),
+    'SWD_A' => t('Swedbank Direktbetalning'),
+    'HNS' => t('HansaBank'),
+    'ING' => t('iDeal Web Payment (ING Bank)'),
+    'NDB2' => t('Nordea Solo-E betaling (Sweden)'),
+    'OKO' => t('OKO Web Payment'),
+    'P24_A' => t('Przelewy24'),
+    'PAGOC' => t('PagoCard'),
+    'RBS' => t('Royal Bank of Scotland iDeal Payment'),
+    'SAMPO' => t('Sampo Web Payment'),
+    'SEB_A' => t('SEB Direktbetalning'),
+    'SHB_A' => t('SHB Direktbetalning'),
+    'SOLO' => t('Nordea Solo-E betaling (Denmark)'),
+    'SOLOFI' => t('Nordea Solo-E payment (Finland)'),
+    'TAP' => t('Tapiola'),
+  );
+}
+function _dibs_paymentwindow_paytypes_netbanks() {
+  return array(
+    'AAL' => t('Ålandsbanken'),
+    'AKT_A' => t('Aktia Web Payment'),
+    'swd_a' => t('Swedbank Direktbetalning'),
+    'NDB2' => t('Nordea Solo-E betaling (Sweden)'),
+    'P24_A' => t('Przelewy24'),
+    'seb_a' => t('SEB Direktbetalning'),
+    'shb_a' => t('SHB Direktbetalning'),
+    'TAP' => t('Tapiola'),
+  );
+}
+
+function dibs_paytypes_invoices($paywin_type) {
+  switch($paywin_type) {
+    case DIBS_FLEXWIN:
+    case DIBS_PAYMENT_WINDOW:
+      return array(
+        'pbb' => t('PayByBill'),
+        'pbbtest' => t('PayByBill Test'),
+        'cl_inv' => t('Collector PayPort'),
+        'cl_invtest' => t('Collector PayPort Test'),
+        'cl_ins' => t('Collector PayPort Installment'),
+        'cl_instest' => t('Collector PayPort Installment Test'),
+        'sv_inv' => t('SveaWebPay'),
+        'sv_invtest' => t('SveaWebPay Test'),
+        'sv_ins' => t('SveaWebPay Installments'),
+        'sv_instest' => t('SveaWebPay Installments Test'),
+        'kl_inv' => t('Klarna'),
+        'kl_invtest' => t('Klarna Test'),
+        'kl_ins' => t('Klarna Installments'),
+        'kl_instest' => t('Klarna Installments Test'),
+        'shb_inv' => t('Handelsbanken Finans'),
+        'shbinvtest' => t('Handelsbanken Finans Test'),
+      );
+    
+    default:
+      throw new Exception();
+  }
 }
