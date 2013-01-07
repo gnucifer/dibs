@@ -457,6 +457,21 @@ function dibs_admin_settings_form_validate($form, &$form_state) {
   }
 }
 
+function _dibs_admin_compile_paytype($paywin_type, &$settings) {
+  $paytypes = array();
+  foreach($settings as &$setting) {
+    $setting['types'] = array_filter($setting['types']);
+    if($setting['selection'] === 'select') {
+      $paytypes = array_merge($paytypes, array_values($setting['types']));
+    }
+    elseif (!empty($setting['selection'])) {
+      $paytypes[] = $setting['selection'];
+    }
+  }
+  asort($paytypes);
+  return implode(',', $paytypes);
+} 
+
 /**
  * Process the settings form submit
  *
@@ -480,27 +495,8 @@ function dibs_admin_settings_form_submit($form, &$form_state) {
     exit;
   }
 
-  $paymentwindow['paytypes'] = array();
-  foreach(array_keys(dibs_paytypes_types(DIBS_PAYMENT_WINDOW)) as $key) {
-    $paymentwindow['payment_types'][$key]['types'] = array_filter($paymentwindow['payment_types'][$key]['types']);
-    if($paymentwindow['payment_types'][$key]['selection'] === 'select') {
-      $paymentwindow['paytypes'] = array_merge($paymentwindow['paytypes'], array_values($paymentwindow['payment_types'][$key]['types']));
-    }
-    elseif (!empty($paymentwindow['payment_types'][$key]['selection'])) {
-      $paymentwindow['paytypes'][] = $paymentwindow['payment_types'][$key]['selection'];
-    }
-  }
-
-  $flexwindow['paytypes'] = array();
-  foreach(array_keys(dibs_paytypes_types(DIBS_FLEXWIN)) as $key) {
-    $flexwindow['payment_types'][$key]['types'] = array_filter($flexwindow['payment_types'][$key]['types']);
-    if($flexwindow['payment_types'][$key]['selection'] === 'select') {
-      $flexwindow['paytypes'] = array_merge($flexwindow['paytypes'], array_values($flexwindow['payment_types'][$key]['types']));
-    }
-    elseif (!empty($flexwindow['payment_types'][$key]['selection'])) {
-      $flexwindow['paytypes'][] = $flexwindow['payment_types'][$key]['selection'];
-    }
-  }
+  $paymentwindow['paytype'] = _dibs_admin_compile_paytype(DIBS_PAYMENT_WINDOW, $paymentwindow['payment_types']);
+  $flexwindow['paytype'] = _dibs_admin_compile_paytype(DIBS_FLEXWIN, $flexwindow['payment_types']);
 
   // Creating array with settings and saving it as a variable
   $settings = array(

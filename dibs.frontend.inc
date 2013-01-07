@@ -111,7 +111,10 @@ function dibs_payment_data($settings, $transaction) {
     $data['acceptreturnurl'] = $accepturl;
     $data['cancelreturnurl'] = $cancelurl;
     $data['language'] = $lang;
-    //$form['#action'] = 'https://payment.architrade.com/payment/start.pml';
+
+    if(!empty($settings['paymentwindow']['paytype'])) {
+      $data['payType'] = $settings['paymentwindow']['paytype'];
+    }
   }
   // Flex Window fields
   elseif ($settings['general']['type'] === DIBS_FLEXWIN) {
@@ -162,6 +165,10 @@ function dibs_payment_data($settings, $transaction) {
 
     if(!empty($lines)) {
       $data += dibs_create_delivery_line_data($lines);
+    }
+
+    if(!empty($settings['flexwindow']['paytype'])) {
+      $data['payType'] = $settings['flexwindow']['paytype'];
     }
   }
  
