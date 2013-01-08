@@ -38,9 +38,7 @@ function commerce_dibs_dibsapi($op = 'info', $delta = NULL, &$transaction = NULL
       break;
     case 'transaction_accept':
 
-
       watchdog('dibs_commerce', 'transaction accecpt: ' . $transaction['tid'], array(), WATCHDOG_DEBUG);
-
 
       $commerce_transactions = commerce_payment_transaction_load_multiple(FALSE, array('remote_id' => $transaction['tid']));
       // Update transaction(s).
@@ -121,7 +119,6 @@ function commerce_dibs_commerce_payment_transaction_status_info() {
   );
 }
 
-
 /**
  * Payment method callback: settings form.
  */
@@ -140,15 +137,169 @@ function commerce_dibs_settings_form($settings = NULL) {
   return $form;
 }
 
+// Converts commerce order to dibs order information
+//@todo typed argument? Order or order wrapper?
+function _commerce_dibs_order_lines_information($commerce_line_items) {
+
+  $dibs_order_info = new DibsOrderInformation(array(
+    DibsOrderInformation::QUANTITY,
+    DibsOrderInformation::DESCRIPTION,
+    DibsOrderInformation::AMOUNT,
+    DibsOrderInformation::ITEM_ID,
+  ));
+
+  //TODO: check line item wrapper format
+  foreach($commerce_line_items as $line_item_wrapper) {
+    $item_id = NULL;
+    try {
+      $product = $line_item_wrapper->commerce_product;
+      $item_id = $product->sku->value();
+    }
+    catch (EntityMetadataWrapperException $e) {
+      $item_id = $line_item_wrapper->line_item_id->value();
+    }
+    $data = array(
+      intval($line_item_wrapper->quantity->value()),
+      $line_item_wrapper->line_item_label->value(),
+      $line_item_wrapper->commerce_unit_price->amount->value(),
+      $item_id,
+    );
+    $dibs_order_info->addRow($data);
+  }
+  return $dibs_order_info->data();
+}
+
+function _commerce_dibs_customer_billing_address_information($commerce_customer_address) {
+  $dibs_data = array();
+  //This is kludgy and should be done in another way
+  $first_last_name = explode(' ', $commerce_customer_address['name_line'], 2);
+  $first_name = array_shift($first_last_name);
+  if(!empty($first_last_name)) {
+    $last_name = array_shift($first_last_name);
+  }
+
+  if(!empty($commerce_customer_address['first_name'])) {
+    $first_name = $commerce_customer_address['first_name'];
+  }
+  if(!empty($commerce_customer_address['last_name'])) {
+    $last_name = $commerce_customer_address['last_name'];
+  }
+  
+  $dibs_data['billingFistName'] = $first_name;
+  if(isset($last_name)) {
+    $dibs_data['billingLastName'] = $last_name;
+  }
+
+  $dibs_data['billingAddress'] = $commerce_customer_address['thoroughfare']; 
+  
+  if(!empty($commerce_customer_address['premise'])) {
+    $dibs_data['billingAddress2'] = $commerce_customer_address['premise'];
+  }
+  $dibs_data['billingPostalCode'] = $commerce_customer_address['postal_code'];
+  $dibs_data['billingPostalPlace'] = $commerce_customer_address['locality'];
+
+  return $dibs_data;
+}
+
+function _commerce_dibs_customer_shipping_address_information($commerce_customer_address) {
+  $dibs_data = array();
+  //This is kludgy and should be done in another way
+  $first_last_name = explode(' ', $commerce_customer_address['name_line'], 2);
+  $first_name = array_shift($first_last_name);
+  if(!empty($first_last_name)) {
+    $last_name = array_shift($first_last_name);
+  }
+
+  if(!empty($commerce_customer_address['first_name'])) {
+    $first_name = $commerce_customer_address['first_name'];
+  }
+  if(!empty($commerce_customer_address['last_name'])) {
+    $last_name = $commerce_customer_address['last_name'];
+  }
+  
+  $dibs_data['billingFistName'] = $first_name;
+  if(isset($last_name)) {
+    $dibs_data['billingLastName'] = $last_name;
+  }
+
+  $dibs_data['shippingAddress'] = $commerce_customer_address['thoroughfare']; 
+  
+  if(!empty($commerce_customer_address['premise'])) {
+    $dibs_data['shippingAddress2'] = $commerce_customer_address['premise'];
+  }
+  $dibs_data['shippingPostalCode'] = $commerce_customer_address['postal_code'];
+  $dibs_data['shippingPostalPlace'] = $commerce_customer_address['locality'];
+
+  return $dibs_data;
+}
+
+function _commerce_dibs_commerce_order_dibs_data($order_wrapper) {
+  $dibs_data = array();
+  $dibs_data = _commerce_dibs_order_lines_information($order_wrapper->commerce_line_items);
+  if($order_wrapper->commerce_customer_billing) {
+    $dibs_data += _commerce_dibs_customer_billing_address_information(
+      $order_wrapper->commerce_customer_billing->commerce_customer_address->value());
+  }
+  if($order_wrapper->commerce_customer_shipping) {
+    $dibs_data += _commerce_dibs_customer_shipping_address_information(
+      $order_wrapper->commerce_customer_shipping->commerce_customer_address->value());
+  }
+  return $dibs_data;
+}
+
+
+function _commerce_dibs_payment_prepare($order, $payment_method) {
+
+}
+
+function _commerce_dibs_dibs_transaction_data($order, $api_module, $api_delta) {
+  $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+  $currency_code = $order_wrapper->commerce_order_total->currency_code->value();
+  $currency_info = commerce_currency_load($currency_code);
+  $data = array(
+    'api_module'          => 'commerce_dibs',
+    'api_delta'           => 'commerce_dibs',
+    'payment_price'       => $order_wrapper->commerce_order_total->amount->value(),
+    'payment_currency'    => $currency_info['numeric_code'],
+    'payment_order_id'    => '',
+    'params'              => array(
+      'commerce_order_id' => $order_wrapper->order_id->value(),
+      'payment_redirect_key' => $order->data['payment_redirect_key'],
+    ),
+  );
+  return $data;
+}
+
+function _commerce_dibs_commerce_transaction($order_wrapper, $payment_method, $dibs_transaction_id) {
+  $transaction = commerce_payment_transaction_new($payment_method['method_id'], $order_wrapper->order_id->value());
+  $transaction->instance_id = $payment_method['instance_id'];
+  $transaction->amount = $order_wrapper->commerce_order_total->amount->value();
+  $transaction->currency_code = $order_wrapper->commerce_order_total->currency_code->value();
+  $transaction->status = COMMERCE_PAYMENT_STATUS_PENDING; 
+  $transaction->remote_id = $dibs_transaction_id;
+  commerce_payment_transaction_save($transaction);
+  return $transaction;
+}
+
 /**
  * Payment method callback: redirect form, a wrapper around the module's general
  *   use function for building a WPS form.
  */
 function commerce_dibs_redirect_form($form, &$form_state, $order, $payment_method) {
-  $use_split = !empty($payment_method['settings']['split']);
-  // Save the transaction, so we know that it has been made in the commerce UI.
-  $order = commerce_order_load($order->order_id);
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+  $data = _commerce_dibs_dibs_transaction_data($order, 'commerce_dibs', 'commerce_dibs');
+  $dibs_params = _commerce_dibs_commerce_order_dibs_data($order_wrapper);
+  $data['params'] += $dibs_params;
+
+  // Prepare the DIBS payment
+  $hash = dibs_payment_prepare($data, FALSE);
+  $dibs_transaction = dibs_transaction_hash_load($hash);
+
+  //Why load order again?
+  //$order = commerce_order_load($order->order_id);
+
+  $use_split = !empty($payment_method['settings']['split']);
+  
   if ($use_split && count($order_wrapper->commerce_line_items->value()) > 1) {
     $count = 1;
     $split_payments = array();
@@ -160,20 +311,28 @@ function commerce_dibs_redirect_form($form, &$form_state, $order, $payment_metho
       $transaction->currency_code = $order_wrapper->commerce_order_total->currency_code->value();
       $transaction->status = COMMERCE_PAYMENT_STATUS_PENDING;
       $transaction->payload = array('delta' => $count, 'commerce_line_item_id' => $line_item_wrapper->line_item_id->value());
+      $transaction->remote_id = $dibs_transaction['tid'];
       commerce_payment_transaction_save($transaction);
       $split_payments[] = $transaction->amount;
       $commerce_transactions[] = $transaction;
       $count += 1;
     }
+    $dibs_transaction['params']['split_payment_price'] = $split_payments;
+    $dibs_transaction['split_payments'] = count($split_payments);
+    drupal_write_record('dibs_transactions', $dibs_transaction);
   }
   else {
     $use_split = FALSE;
+    /*
     $transaction = commerce_payment_transaction_new('commerce_dibs', $order->order_id);
     $transaction->instance_id = $payment_method['instance_id'];
     $transaction->amount = $order_wrapper->commerce_order_total->amount->value();
     $transaction->currency_code = $order_wrapper->commerce_order_total->currency_code->value();
     $transaction->status = COMMERCE_PAYMENT_STATUS_PENDING;
     commerce_payment_transaction_save($transaction);
+    */
+    // Prepare the commerce transaction
+    $transaction = _commerce_dibs_commerce_transaction($order_wrapper, $payment_method, $dibs_transaction['tid']);
   }
 
   /**
@@ -202,8 +361,9 @@ function commerce_dibs_redirect_form($form, &$form_state, $order, $payment_metho
   * All info without type specified should be strings.
   */
 
-  $currency_info = commerce_currency_load($transaction->currency_code);
 
+  //$currency_info = commerce_currency_load($transaction->currency_code);
+  /*
   $data = array(
     'api_module'          => 'commerce_dibs',
     'api_delta'           => 'commerce_dibs',
@@ -215,27 +375,8 @@ function commerce_dibs_redirect_form($form, &$form_state, $order, $payment_metho
       'payment_redirect_key' => $order->data['payment_redirect_key'],
     ),
   );
+   */
 
-  if ($use_split) {
-    $data['params']['split_payment_price'] = $split_payments;
-    $data['split_payments'] = count($split_payments);
-  }
-
-  // Prepare the DIBS payment
-  $hash = dibs_payment_prepare($data, FALSE);
-  $dibs_transaction = dibs_transaction_hash_load($hash);
-
-  // Update the commerce transaction with the dibs tid.
-  if ($use_split) {
-    foreach ($commerce_transactions as $transaction) {
-      $transaction->remote_id = $dibs_transaction['tid'];
-      commerce_payment_transaction_save($transaction);
-    }
-  }
-  else {
-    $transaction->remote_id = $dibs_transaction['tid'];
-    commerce_payment_transaction_save($transaction);
-  }
   $settings = dibs_load_settings('commerce_dibs', 'commerce_dibs');
   $settings['auto_submit'] = 1;
 

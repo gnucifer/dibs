@@ -104,6 +104,121 @@ function dibs_transaction_status_validate($code) {
   );
 }
 
+// http://tech.dibs.dk/integration_methods/dibs_payment_window/order_information/
+class DibsOrderInformation {
+
+  const QUANTITY = 'QUANTITY';
+  const DESCRIPTION = 'DESCRIPTION';
+  const AMOUNT = 'AMOUNT';
+  const VAT_AMOUNT = 'VATAMOUNT';
+  const VAT_PERCENT = 'VATPERCENT';
+  const ITEM_ID = 'ITEMID';
+  const UNIT_CODE = 'UNITCODE';
+
+  const VALUE_SEPARATOR = ';';
+
+  protected $rows = array();
+  protected $types = array(); 
+  protected $types_labels = array();
+
+  function __construct($types = NULL, $types_labels = NULL) {
+    $this->types = array(
+      self::QUANTITY,
+      self::DESCRIPTION,
+      self::AMOUNT, // Dibs documentation does not say, but supposing smallest currency unit
+      self::VAT_AMOUNT, // According to documentation in smallest currency unit 
+      self::VAT_PERCENT, //Percentage multiplied by 100
+      self::ITEM_ID,
+      self::UNIT_CODE,
+    );
+    if(isset($types)) {
+      if(count(array_diff($types, $this->types))) {
+        //@todo: message
+        throw new Exception();
+      }
+      $this->types = $types;
+    }
+
+    $this->types_labels = array(
+      self::QUANTITY => t('Quantity'),
+      self::DESCRIPTION => t('Description'),
+      self::AMOUNT => t('Amount'),
+      self::VAT_AMOUNT => t('VAT Amount'),
+      self::VAT_PERCENT => t('VAT Percent'),
+      self::ITEM_ID => t('Item id'),
+      self::UNIT_CODE => t('Unit code'),
+    );
+    if(isset($types_labels)) {
+      if(count(array_diff_key($types_labels, $this->types_labels))) {
+        throw new Exception();
+      }
+      $this->types_labels = $types_labels + $this->types_labels;
+    }
+  }
+
+  protected function validate($type, $value) {
+    //Some basic validation, not in any way complete
+    $value = (string) $value;
+    switch($type) {
+      case self::QUANTITY:
+      case self::AMOUNT:
+      case self::VAT_AMOUNT:
+      case self::VAT_PERCENT:    
+        if(!ctype_digit($value)) {
+          throw new Exception(
+            t('Invalid "!type" value: "!value", must be an integer value',
+            array('%!ype' => $type, '!value' => '!value')));
+        }
+      default:
+        // Unreachable?
+        if(!is_string($value)) {
+          throw new Exception(t('Invalid "!type" value, could not be converted to string', array('!type' => $type)));
+        }
+    }
+  }
+
+  public function addRowAssoc(array $data) {
+    $keys = array_intersect($this->types, array_keys($data));
+    $_data = array();
+    foreach($keys as $key) {
+      $_data[] = $data[$key];
+    }
+    return $this->addRow($_data);
+  }
+
+  public function addRow(array $data) {
+    if(count($data) !== count($this->types)) {
+      throw new Exception();
+    }
+    $_data = array_combine($this->types, $data);
+    foreach($_data as $type => $value) {
+      $this->validate($type, $value);
+      //Escape separator
+      $_data[$type] = str_replace(self::VALUE_SEPARATOR, '\\' . self::VALUE_SEPARATOR, $value);
+    }
+    $this->rows[] = $_data;
+  }
+
+  function data() {
+    $data = array();
+    $data['oiTypes'] = implode(self::VALUE_SEPARATOR, $this->types);
+
+    //We don't use array_intersect_key because we want to make sure
+    //correct order is maintained
+    $labels = array();
+    foreach($this->types as $type) {
+      $labels[] = $this->types_labels[$type];
+    }
+    $data['oiNames'] = implode(self::VALUE_SEPARATOR, $labels);
+
+    foreach($this->rows as $i => $row_data) {
+      $line_number = $i + 1;
+      $data['oiRow' . $line_number] = implode(self::VALUE_SEPARATOR, $row_data);
+    }
+    return $data;
+  }
+}
+
 /**
  * Implementation of hook_init().
  */
@@ -657,7 +772,7 @@ function dibs_payment_prepare($data, $redirect = TRUE) {
 
   // Redirecting to the payment redirect page
   if ($redirect) {
-    drupal_goto('payment/dibs/redirect/'.$hash);
+    drupal_goto('payment/dibs/redirect/' . $hash);
     exit;
   }
 

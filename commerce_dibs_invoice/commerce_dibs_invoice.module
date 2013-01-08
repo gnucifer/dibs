@@ -1,0 +1,108 @@
+<?php
+/**
+ * @file
+ * Integrate DIBS payment gateway with Drupal Commerce
+ */
+
+/**
+ * Implementation of hook_dibsapi().
+ */
+function commerce_dibs_invoice_dibsapi($op = 'info', $delta = NULL, &$transaction = NULL, $a3 = NULL, $a4 = NULL) {
+  switch ($op) {
+    case 'info':
+      $info['commerce_dibs_invoice'] = array('info' => t('Commerce dibs invoice'));
+      if (!empty($delta)) {
+        return isset($info[$delta]) ? $info[$delta] : NULL;
+      }
+      else {
+        return $info;
+      }
+      break;
+    case 'transaction_cancel':
+      $commerce_transactions = commerce_payment_transaction_load_multiple(FALSE, array('remote_id' => $transaction['tid']));
+      $order = commerce_order_load($transaction['params']['commerce_order_id']);
+
+      if ($order && $commerce_transactions) {
+        drupal_set_message(t('You have canceled your payment at DIBS'), 'warning');
+        // Update transaction(s).
+        foreach ($commerce_transactions as $commerce_transaction) {
+          $commerce_transaction->message = 'Declined payment';
+          $commerce_transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
+          commerce_payment_transaction_save($commerce_transaction);
+        }
+        drupal_goto('checkout/' . $order->order_id . '/payment/back/' . $transaction['params']['payment_redirect_key']);
+      }
+      else {
+        // TODO: Set error message.
+      }
+      break;
+    case 'transaction_accept':
+
+
+      watchdog('dibs_commerce', 'transaction accecpt: ' . $transaction['tid'], array(), WATCHDOG_DEBUG);
+
+
+      $commerce_transactions = commerce_payment_transaction_load_multiple(FALSE, array('remote_id' => $transaction['tid']));
+      // Update transaction(s).
+      if ($commerce_transactions) {
+        if ($transaction['split_payments'] == 1) {
+          $commerce_transaction = array_shift($commerce_transactions);
+          $commerce_transaction->message = 'Payment completed at DIBS';
+          $commerce_transaction->status = COMMERCE_CREDIT_AUTH_ONLY;
+          $commerce_transaction->payload['dibs_id'] = $transaction['payment_transaction_id'];
+          commerce_payment_transaction_save($commerce_transaction);
+        }
+        else {
+          foreach ($commerce_transactions as $commerce_transaction) {
+            $delta = $commerce_transaction->payload['delta'];
+            $commerce_transaction->message = 'Payment completed at DIBS';
+            $commerce_transaction->status = COMMERCE_CREDIT_AUTH_ONLY;
+            $commerce_transaction->payload['dibs_id'] = $transaction['dibs_split_payments'][$delta];
+            commerce_payment_transaction_save($commerce_transaction);
+          }
+        }
+      }
+
+
+      $commerce_transactions = commerce_payment_transaction_load_multiple(FALSE, array('remote_id' => $transaction['tid']));
+      $order = commerce_order_load($transaction['params']['commerce_order_id']);
+
+      if ($order && $commerce_transactions) {
+        foreach ($commerce_transactions as $commerce_transaction) {
+          if ($commerce_transaction->status !== COMMERCE_CREDIT_AUTH_ONLY) {
+            watchdog('dibs_commerce', print_r($commerce_transaction, TRUE), array(), WATCHDOG_DEBUG);
+            drupal_set_message(t('Unable to verify your payment, please try again.'), 'error');
+            drupal_goto('checkout/' . $order->order_id . '/payment/back/' . $transaction['params']['payment_redirect_key']);
+          }
+        }
+        drupal_goto('checkout/' . $order->order_id . '/payment/return/' . $transaction['params']['payment_redirect_key']);
+      }
+      else {
+        // TODO: Set error message.
+      }
+      break;
+    case 'transaction_callback':
+
+      watchdog('dibs_commerce', 'transaction callback: ' . $transaction['tid'], array(), WATCHDOG_DEBUG);
+
+      break;
+  }
+}
+
+/**
+ * Implements hook_commerce_payment_transaction_status_info().
+ */
+/*
+function commerce_dibs_invoice_commerce_payment_transaction_status_info() {
+  // Since we use COMMERCE_CREDIT_AUTH_ONLY for decerning that a payment has
+  // been autorized. We need to add that for the payment listing at orders.
+  return array(
+    COMMERCE_CREDIT_AUTH_ONLY => array(
+      'status' => COMMERCE_PAYMENT_STATUS_PENDING,
+      'title' => t('Authorize'),
+      'icon' => drupal_get_path('module', 'commerce_dibs_invoice') . '/auth-icon.png',
+      'total' => FALSE,
+    ),
+  );
+}
+*/
