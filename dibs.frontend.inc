@@ -230,9 +230,6 @@ function dibs_frontend_redirect_form($form, &$form_state = array(), $settings, $
   
   $data = dibs_payment_data($settings, $transaction, $extra_params);
 
-  dsm('data');
-  dsm($data);
-
   foreach($data as $key => $value) {
     $form[$key] = array(
       '#type' => 'hidden',
@@ -254,7 +251,7 @@ function dibs_frontend_redirect_form($form, &$form_state = array(), $settings, $
 
   // Additional form fields
   $form['submit'] = array('#type' => 'submit', '#value' => t('Continue to DIBS payment'));
-  if (!empty($settings['auto_submit']) && FALSE) {
+  if (!empty($settings['auto_submit'])) {
     $form['submit']['#attached']['js'][] = drupal_get_path('module', 'dibs') . '/dibs.auto_submit.js';
   }
 

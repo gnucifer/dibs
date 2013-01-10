@@ -287,11 +287,11 @@ function _commerce_dibs_dibs_transaction_data($order, $api_module, $api_delta) {
   $currency_code = $order_wrapper->commerce_order_total->currency_code->value();
   $currency_info = commerce_currency_load($currency_code);
   $data = array(
-    'api_module'          => 'commerce_dibs',
-    'api_delta'           => 'commerce_dibs',
+    'api_module'          => $api_module,
+    'api_delta'           => $api_delta,
     'payment_price'       => $order_wrapper->commerce_order_total->amount->value(),
     'payment_currency'    => $currency_info['numeric_code'],
-    'payment_order_id'    => '',
+    'payment_order_id'    => '', // @todo ??
     'params'              => array(
       'commerce_order_id' => $order_wrapper->order_id->value(),
       'payment_redirect_key' => $order->data['payment_redirect_key'],

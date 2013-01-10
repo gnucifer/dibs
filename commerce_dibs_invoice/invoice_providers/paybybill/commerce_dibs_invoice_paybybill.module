@@ -64,8 +64,6 @@ function commerce_dibs_invoice_paybybill_redirect_form($form, &$form_state, $ord
 
   $dibs_params['payType'] = $settings['general']['test_mode'] ? DIBS_INVOICE_PAYBYBILL_TEST : DIBS_INVOICE_PAYBYBILL;
 
-  dsm($dibs_params);
-
   return drupal_get_form('dibs_frontend_redirect_form', $settings, $dibs_transaction, $dibs_params);
 }
 
