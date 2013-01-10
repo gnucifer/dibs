@@ -760,24 +760,23 @@ function dibs_paytypes_invoices($paywin_type) {
     case DIBS_FLEXWIN:
     case DIBS_PAYMENT_WINDOW:
       return array(
-        'pbb' => t('PayByBill'),
-        'pbbtest' => t('PayByBill Test'),
-        'cl_inv' => t('Collector PayPort'),
-        'cl_invtest' => t('Collector PayPort Test'),
-        'cl_ins' => t('Collector PayPort Installment'),
-        'cl_instest' => t('Collector PayPort Installment Test'),
-        'sv_inv' => t('SveaWebPay'),
-        'sv_invtest' => t('SveaWebPay Test'),
-        'sv_ins' => t('SveaWebPay Installments'),
-        'sv_instest' => t('SveaWebPay Installments Test'),
-        'kl_inv' => t('Klarna'),
-        'kl_invtest' => t('Klarna Test'),
-        'kl_ins' => t('Klarna Installments'),
-        'kl_instest' => t('Klarna Installments Test'),
-        'shb_inv' => t('Handelsbanken Finans'),
-        'shbinvtest' => t('Handelsbanken Finans Test'),
+        DIBS_INVOICE_PAYBYBILL => t('PayByBill'),
+        DIBS_INVOICE_PAYBYBILL_TEST => t('PayByBill Test'),
+        DIBS_INVOICE_COLLECTOR_PAYPORT => t('Collector PayPort'),
+        DIBS_INVOICE_COLLECTOR_PAYPORT_TEST => t('Collector PayPort Test'),
+        DIBS_INVOICE_COLLECTOR_PAYPORT_INSTALLMENT => t('Collector PayPort Installment'),
+        DIBS_INVOICE_COLLECTOR_PAYPORT_INSTALLMENT_TEST => t('Collector PayPort Installment Test'),
+        DIBS_INVOICE_SVEAWEBPAY => t('SveaWebPay'),
+        DIBS_INVOICE_SVEAWEBPAY_TEST => t('SveaWebPay Test'),
+        DIBS_INVOICE_SVEAWEBPAY_INSTALLMENT => t('SveaWebPay Installments'),
+        DIBS_INVOICE_SVEAWEBPAY_INSTALLMENT_TEST => t('SveaWebPay Installments Test'),
+        DIBS_INVOICE_KLARNA => t('Klarna'),
+        DIBS_INVOICE_KLARNA_TEST => t('Klarna Test'),
+        DIBS_INVOICE_KLARNA_INSTALLMENT => t('Klarna Installments'),
+        DIBS_INVOICE_KLARNA_INSTALLMENT_TEST => t('Klarna Installments Test'),
+        DIBS_INVOICE_HANDELSBANKEN_FINANS => t('Handelsbanken Finans'),
+        DIBS_INVOICE_HANDELSBANKEN_FINANS_TEST => t('Handelsbanken Finans Test'),
       );
-    
     default:
       throw new Exception();
   }

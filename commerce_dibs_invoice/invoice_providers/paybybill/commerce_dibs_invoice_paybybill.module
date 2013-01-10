@@ -7,65 +7,35 @@ function commerce_dibs_invoice_paybybill_commerce_payment_method_info() {
   $payment_methods['commerce_dibs_invoice_paybybill'] = array(
     'title' => t('DIBS invoice PayByBill'),
     'description' => t('Invoice payment using the DIBS PayByBill provider.'),
-    'display_title' => t('DIBS Payment PayByBill'),
+    'display_title' => t('DIBS invoice PayByBill'),
     'offsite' => TRUE,
   );
-
   return $payment_methods;
 }
-
+// @todo, settings for label!
 /**
  * Payment method callback: settings form.
  */
 function commerce_dibs_invoice_paybybill_settings_form($settings = NULL) {
   $form = array();
   $form['info']['#markup'] = l(t('Setup commerce dibs invoice'), 'admin/config/payment/dibs/edit/commerce_dibs_invoice_paybybill/commerce_dibs_invoice_paybybill');
-  $form['invoice_fee'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Invoice fee'),
-    '#description' => t('Invoice fee (expressed in minor unit of currency). Leave blank for no invoice fee.'),
-    '#default_value' => isset($settings['invoice_fee']) ? $settings['invoice_fee'] : NULL,
-  );
-  $form['invoice_fee_vat'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Invoice fee VAT'),
-    '#description' => t('Invoice Fee VAT (e.g. "25%" is expressed as "2500"), must be set if invoiceFee is present.'),
-    '#default_value' => isset($settings['invoice_fee_vat']) ? $settings['invoice_fee_vat'] : NULL,
-  );
-  $form['enable_comments'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Enable customer comments'),
-    '#default_value' => isset($settings['enable_comments']) ? $settings['enable_comments'] : NULL,
-  );
-
+  $form += _commerce_dibs_invoice_settings_form($settings);
   return $form;
 }
 
 /**
  * Payment method callback: submit form.
  */
-
 function commerce_dibs_invoice_paybybill_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
-  $settings = $payment_method['settings'];
-  $form = array();
-  $form['social_security_number'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Social security number'),
-    //'#description' => print_r($payment_method, TRUE),
-  );
+  return _commerce_dibs_invoice_submit_form($payment_method, $pane_values, $checkout_pane, $order);
+}
 
- $form['organization_number'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Organization number'),
-  );
+/**
+ * Payment method callback: submit form submit handler.
+ */
 
-  if($settings['enable_comments']) {
-    $form['comments'] = array(
-      '#type' => 'textarea',
-      '#title' => t('Message'),
-    );
-  }
-  return $form;
+function commerce_dibs_invoice_paybybill_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge) {
+  _commerce_dibs_invoice_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge);
 }
 
 /**
@@ -75,12 +45,9 @@ function commerce_dibs_invoice_paybybill_submit_form($payment_method, $pane_valu
 
 function commerce_dibs_invoice_paybybill_redirect_form($form, &$form_state, $order, $payment_method) {
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
-  $dibs_params = _commerce_dibs_commerce_order_dibs_data($order_wrapper);
-  $data = _commerce_dibs_dibs_transaction_data($order, 'commerce_dibs_invoice_paybybill', 'commerce_dibs_invoice_paybybill');
-
-  $data['params'] += $dibs_params;
 
   // Prepare the DIBS payment
+  $data = _commerce_dibs_dibs_transaction_data($order, 'commerce_dibs_invoice_paybybill', 'commerce_dibs_invoice_paybybill');
   $hash = dibs_payment_prepare($data, FALSE);
   $dibs_transaction = dibs_transaction_hash_load($hash);
 
@@ -92,6 +59,13 @@ function commerce_dibs_invoice_paybybill_redirect_form($form, &$form_state, $ord
 
   module_load_include('inc', 'dibs', 'dibs.frontend');
 
-  return drupal_get_form('dibs_frontend_redirect_form', $settings, $dibs_transaction);
+  $dibs_params = _commerce_dibs_commerce_order_dibs_data($order_wrapper) +
+    _commerce_dibs_invoice_dibs_data($order_wrapper, $payment_method);
+
+  $dibs_params['payType'] = $settings['general']['test_mode'] ? DIBS_INVOICE_PAYBYBILL_TEST : DIBS_INVOICE_PAYBYBILL;
+
+  dsm($dibs_params);
+
+  return drupal_get_form('dibs_frontend_redirect_form', $settings, $dibs_transaction, $dibs_params);
 }
 

@@ -143,14 +143,18 @@ function _commerce_dibs_order_lines_information($commerce_line_items) {
 
   $dibs_order_info = new DibsOrderInformation(array(
     DibsOrderInformation::QUANTITY,
+    DibsOrderInformation::UNIT_CODE,
     DibsOrderInformation::DESCRIPTION,
     DibsOrderInformation::AMOUNT,
     DibsOrderInformation::ITEM_ID,
+    DibsOrderInformation::VAT_AMOUNT,
   ));
 
   //TODO: check line item wrapper format
   foreach($commerce_line_items as $line_item_wrapper) {
     $item_id = NULL;
+
+    // Extract potiential pruduct-sku
     try {
       $product = $line_item_wrapper->commerce_product;
       $item_id = $product->sku->value();
@@ -158,11 +162,37 @@ function _commerce_dibs_order_lines_information($commerce_line_items) {
     catch (EntityMetadataWrapperException $e) {
       $item_id = $line_item_wrapper->line_item_id->value();
     }
+
+    $item_amount = $line_item_wrapper->commerce_unit_price->amount->value();
+    $vat_amount = 0;
+
+    // Extract potential VAT-information
+    try {
+      $unit_price = $line_item_wrapper->commerce_unit_price;
+      $data = $unit_price->data->value();
+      foreach($data['components'] as $component) {
+        if(
+          isset($component['price']['data']['tax_rate']['type']) &&
+          $component['price']['data']['tax_rate']['type'] === 'vat'
+        ) {
+          //@todo: wrapper support?
+          $vat_type = commerce_tax_type_load('vat');
+          $vat_amount += $component['price']['amount'];
+          if($vat_type['display_inclusive']) {
+            $item_amount -= $vat_amount;
+          }
+        }
+      }
+    }
+    catch (EntityMetadataWrapperException $e) {}
+
     $data = array(
       intval($line_item_wrapper->quantity->value()),
+      'pcs',
       $line_item_wrapper->line_item_label->value(),
-      $line_item_wrapper->commerce_unit_price->amount->value(),
+      $item_amount,
       $item_id,
+      $vat_amount,
     );
     $dibs_order_info->addRow($data);
   }
@@ -185,7 +215,7 @@ function _commerce_dibs_customer_billing_address_information($commerce_customer_
     $last_name = $commerce_customer_address['last_name'];
   }
   
-  $dibs_data['billingFistName'] = $first_name;
+  $dibs_data['billingFirstName'] = $first_name;
   if(isset($last_name)) {
     $dibs_data['billingLastName'] = $last_name;
   }
@@ -217,7 +247,7 @@ function _commerce_dibs_customer_shipping_address_information($commerce_customer
     $last_name = $commerce_customer_address['last_name'];
   }
   
-  $dibs_data['billingFistName'] = $first_name;
+  $dibs_data['billingFirstName'] = $first_name;
   if(isset($last_name)) {
     $dibs_data['billingLastName'] = $last_name;
   }
@@ -287,11 +317,9 @@ function _commerce_dibs_commerce_transaction($order_wrapper, $payment_method, $d
  */
 function commerce_dibs_redirect_form($form, &$form_state, $order, $payment_method) {
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
-  $data = _commerce_dibs_dibs_transaction_data($order, 'commerce_dibs', 'commerce_dibs');
-  $dibs_params = _commerce_dibs_commerce_order_dibs_data($order_wrapper);
-  $data['params'] += $dibs_params;
 
   // Prepare the DIBS payment
+  $data = _commerce_dibs_dibs_transaction_data($order, 'commerce_dibs', 'commerce_dibs');
   $hash = dibs_payment_prepare($data, FALSE);
   $dibs_transaction = dibs_transaction_hash_load($hash);
 
@@ -382,5 +410,7 @@ function commerce_dibs_redirect_form($form, &$form_state, $order, $payment_metho
 
   module_load_include('inc', 'dibs', 'dibs.frontend');
 
-  return drupal_get_form('dibs_frontend_redirect_form', $settings, $dibs_transaction);
+  $dibs_params = _commerce_dibs_commerce_order_dibs_data($order_wrapper);
+
+  return drupal_get_form('dibs_frontend_redirect_form', $settings, $dibs_transaction, $dibs_params);
 }

@@ -4,6 +4,8 @@
  * Front end functions for the DIBS module
  */
 
+//@todo: fix mixing of camel-case and lowercase in dibs parameters
+
 /**
  * Page with hidden form fields that redirects to the DIBS payment
  *
@@ -46,14 +48,16 @@ function dibs_frontend_redirect_page($transaction) {
   // We are forcing the accept-charset to be ISO-8859-1, else will the order and delivery
   // info sent to DIBS be shown with wrong characters in the payment window and in their
   // administration system.
+  /*
   if ($settings['general']['type'] === DIBS_PAYMENT_WINDOW) {
     $form['#attributes']['accept-charset'] = 'ISO-8859-1';
   }
+  */
 
   return theme('dibs_redirect_page', array('form' => $form, 'settings' => $settings, 'transaction' => $transaction));
 }
 
-function dibs_payment_data($settings, $transaction) {
+function dibs_payment_data($settings, $transaction, $extra_params = array()) {
   $data = array();
   if (isset($transaction['payment_retry_count']) && $transaction['payment_retry_count']) {
     $data['payment_order_id'] =  $transaction['payment_order_id'] . '-' . $transaction['payment_retry_count'];
@@ -78,11 +82,7 @@ function dibs_payment_data($settings, $transaction) {
   $data['orderid'] = $transaction['payment_order_id'];
 
   $data['callbackurl'] = url($settings['callbacks']['callbackok'] . '/' . $transaction['api_hash'], array('absolute' => TRUE));
-  //TODO: What is this used for?
-  /*
-  $data['api_module'] = $transaction['api_module'];
-  $data['api_delta'] = $data['api_delta'];
-  */
+ 
   // Optional fields
   if ($settings['general']['test_mode']) {
     $data['test'] = 1;
@@ -97,12 +97,11 @@ function dibs_payment_data($settings, $transaction) {
     $data['calcfee'] = 1;
   }
 
-  // Payment Window fields
-  //Parameters dibs though be a good idea to give different names depending on payment window
   $accepturl = url($settings['callbacks']['accepturl'] . '/' . $transaction['api_hash'], array('absolute' => TRUE));
   $cancelurl = url($settings['callbacks']['cancelurl'] . '/' . $transaction['api_hash'], array('absolute' => TRUE));
-  $lang = $settings['general']['lang'];
+  $lang = $settings['general']['lang']; //@todo: fix!
   
+  // Payment Window fields
   if ($settings['general']['type'] === DIBS_PAYMENT_WINDOW) {
     if ($settings['paymentwindow']['color']) {
       $data['color'] = $settings['paymentwindow']['color'];
@@ -168,9 +167,11 @@ function dibs_payment_data($settings, $transaction) {
     }
 
     if(!empty($settings['flexwindow']['paytype'])) {
-      $data['payType'] = $settings['flexwindow']['paytype'];
+      $data['payType'] = $settings['flexwindow']['payType'];
     }
   }
+
+  $data = $extra_params + $data;
  
   //Allow other modules to make alterations
   drupal_alter('dibs_payment_data', $data, $transaction, $settings);
@@ -224,9 +225,13 @@ function dibs_transaction_key($key) {
  *
  * @return array
  */
-function dibs_frontend_redirect_form($form, &$form_state = array(), $settings, $transaction) {
+//@todo: The $extra_params is a temporary hack, fix properly later at more thorough refactor of dibs-api
+function dibs_frontend_redirect_form($form, &$form_state = array(), $settings, $transaction, $extra_params = array()) {
   
-  $data = dibs_payment_data($settings, $transaction);
+  $data = dibs_payment_data($settings, $transaction, $extra_params);
+
+  dsm('data');
+  dsm($data);
 
   foreach($data as $key => $value) {
     $form[$key] = array(
@@ -249,7 +254,7 @@ function dibs_frontend_redirect_form($form, &$form_state = array(), $settings, $
 
   // Additional form fields
   $form['submit'] = array('#type' => 'submit', '#value' => t('Continue to DIBS payment'));
-  if (!empty($settings['auto_submit'])) {
+  if (!empty($settings['auto_submit']) && FALSE) {
     $form['submit']['#attached']['js'][] = drupal_get_path('module', 'dibs') . '/dibs.auto_submit.js';
   }
 

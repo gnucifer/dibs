@@ -1,4 +1,8 @@
 <?php
+/**
+ * @file
+ * Handle DIBS payment integration
+ */
 //TODO: implement transactoins etc as entities using entity api, generate admin ui etc
 
 /**
@@ -19,11 +23,7 @@ define('DIBS_FLEXWIN_URL', 'https://payment.architrade.com/paymentweb/start.acti
 
 define('DIBS_MAXIMUM_ORDER_LINES', 9); //According to: http://tech.dibspayment.com/dibs_api/other_features/order_information_in_dibs/
 
-/**
- * @file
- * Handle DIBS payment integration
- */
-
+// DIBS transaction statuses
 define('DIBS_TRANSACTION_UNKNOWN_STATUS', -1);
 define('DIBS_TRANSACTION_INSERTED', 0);
 define('DIBS_TRANSACTION_DECLINED', 1);
@@ -45,6 +45,24 @@ define('DIBS_TRANSACTION_AWAITING_SHOP_APPROVAL', 16);
 define('DIBS_TRANSACTION_DECLINED_BY_DIBS', 17);
 define('DIBS_TRANSACTION_MULTICAP_TRANSACTION_OPEN', 18);
 define('DIBS_TRANSACTION_MULTICAP_TRANSACTION_CLOSED', 19);
+
+// DIBS invoices
+DEFINE('DIBS_INVOICE_PAYBYBILL','pbb');
+DEFINE('DIBS_INVOICE_PAYBYBILL_TEST', 'pbbtest');
+DEFINE('DIBS_INVOICE_COLLECTOR_PAYPORT', 'cl_inv');
+DEFINE('DIBS_INVOICE_COLLECTOR_PAYPORT_TEST', 'cl_invtest');
+DEFINE('DIBS_INVOICE_COLLECTOR_PAYPORT_INSTALLMENT', 'cl_ins');
+DEFINE('DIBS_INVOICE_COLLECTOR_PAYPORT_INSTALLMENT_TEST', 'cl_instest');
+DEFINE('DIBS_INVOICE_SVEAWEBPAY', 'sv_inv');
+DEFINE('DIBS_INVOICE_SVEAWEBPAY_TEST', 'sv_invtest');
+DEFINE('DIBS_INVOICE_SVEAWEBPAY_INSTALLMENT', 'sv_ins');
+DEFINE('DIBS_INVOICE_SVEAWEBPAY_INSTALLMENT_TEST', 'sv_instest');
+DEFINE('DIBS_INVOICE_KLARNA', 'kl_inv');
+DEFINE('DIBS_INVOICE_KLARNA_TEST', 'kl_invtest');
+DEFINE('DIBS_INVOICE_KLARNA_INSTALLMENT', 'kl_ins');
+DEFINE('DIBS_INVOICE_KLARNA_INSTALLMENT_TEST', 'kl_instest');
+DEFINE('DIBS_INVOICE_HANDELSBANKEN_FINANS', 'shb_inv');
+DEFINE('DIBS_INVOICE_HANDELSBANKEN_FINANS_TEST', 'shbinvtest');
 
 function dibs_transaction_status_description($code) {
   //TODO: or switch avoiding unnecessary calls to t()?
@@ -209,7 +227,7 @@ class DibsOrderInformation {
     foreach($this->types as $type) {
       $labels[] = $this->types_labels[$type];
     }
-    $data['oiNames'] = implode(self::VALUE_SEPARATOR, $labels);
+    //$data['oiNames'] = implode(self::VALUE_SEPARATOR, $labels);
 
     foreach($this->rows as $i => $row_data) {
       $line_number = $i + 1;

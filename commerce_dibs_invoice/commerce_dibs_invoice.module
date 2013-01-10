@@ -38,9 +38,7 @@ function commerce_dibs_invoice_dibsapi($op = 'info', $delta = NULL, &$transactio
       break;
     case 'transaction_accept':
 
-
       watchdog('dibs_commerce', 'transaction accecpt: ' . $transaction['tid'], array(), WATCHDOG_DEBUG);
-
 
       $commerce_transactions = commerce_payment_transaction_load_multiple(FALSE, array('remote_id' => $transaction['tid']));
       // Update transaction(s).
@@ -62,7 +60,6 @@ function commerce_dibs_invoice_dibsapi($op = 'info', $delta = NULL, &$transactio
           }
         }
       }
-
 
       $commerce_transactions = commerce_payment_transaction_load_multiple(FALSE, array('remote_id' => $transaction['tid']));
       $order = commerce_order_load($transaction['params']['commerce_order_id']);
@@ -88,6 +85,162 @@ function commerce_dibs_invoice_dibsapi($op = 'info', $delta = NULL, &$transactio
       break;
   }
 }
+
+function _commerce_dibs_invoice_settings_form($settings = NULL) {
+  $form['invoice_fee'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Invoice fee'),
+    '#description' => t('Invoice fee (expressed in minor unit of currency). Leave blank for no invoice fee.'),
+    '#default_value' => isset($settings['invoice_fee']) ? $settings['invoice_fee'] : NULL,
+  );
+  $form['invoice_fee_vat'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Invoice fee VAT'),
+    '#description' => t('Invoice Fee VAT (e.g. "25%" is expressed as "2500"), must be set if invoiceFee is present.'),
+    '#default_value' => isset($settings['invoice_fee_vat']) ? $settings['invoice_fee_vat'] : NULL,
+  );
+  $form['enable_comments'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable customer comments'),
+    '#default_value' => isset($settings['enable_comments']) ? $settings['enable_comments'] : NULL,
+  );
+
+  $form['default_customer_type'] = array(
+    '#type' => 'select',
+    '#title' => t('Default customer type'),
+    '#options' => array(
+      'private_person' => t('Private person'),
+      'company' => t('Company'),
+    ),
+    '#default_value' => isset($settings['invoice_fee']) ? $settings['invoice_fee'] : 'private_person',
+  );
+
+  // @todo: restrict to default value option?
+  $form['default_distribution_type'] = array(
+    '#type' => 'select',
+    '#title' => t('Default distribution type'),
+    '#options' => array(
+      // @todo: constants?
+      'EMAIL' => t('Email'),
+      'PAPER' => t('Paper'), // @todo paper-invoice?
+    ),
+    '#default_value' => isset($settings['default_distribution_type']) ? $settings['default_distribution_type'] : 'EMAIL',
+  );
+
+  /*
+  $form['test'] = array(
+    '#type' => t('Test mode'),
+    '#type' => 'select',
+    '#options' => array(
+      1 => t('Yes'),
+      0 => t('No'),
+    ),
+  );
+  */
+}
+
+// @todo dibs_data/dibs_params?? choose one
+
+function _commerce_dibs_invoice_dibs_data($order_wrapper, $payment_method) {
+  $dibs_data = array();
+
+  $dibs_data['yourRef'] = $order_wrapper->order_id->value();
+
+  $payment_method_settings = $order_wrapper->value()->data[$payment_method['method_id']];
+
+  switch($payment_method_settings['customer_type']) {
+    case 'private_person':
+      if($payment_method_settings['social_security_number']) {
+        $dibs_data['socialSecurityNumber'] = $payment_method_settings['social_security_number'];
+      }
+      break;
+
+    case 'company':
+      if($payment_method_settings['organization_number']) {
+        $dibs_data['organizationNumber'] = $payment_method_settings['organization_number'];
+      }
+    break;
+  }
+
+  if($payment_method_settings['distribution_type'] === 'EMAIL' && isset($payment_method_settings['billing_email'])) {
+    $dibs_data['billingEmail'] = $payment_method_settings['billing_email'];
+
+  }
+  return $dibs_data;
+}
+
+function _commerce_dibs_invoice_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
+  $settings = $payment_method['settings'];
+  $form = array();
+
+  $form['customer_type'] = array(
+    '#type' => 'select',
+    '#title' => t('Private person or company'),
+    '#options' => array(
+      'private_person' => t('Private person'),
+      'company' => t('Company'),
+    ),
+    '#default_value' => isset($settings['default_customer_type']) ? $settings['default_customer_type'] : 'private_person',
+  );
+
+  $form['social_security_number'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Social security number'),
+    '#states' => array(
+      'visible' => array(
+        '#edit-commerce-payment-payment-details-customer-type' => array('value' => 'private_person'),
+      ),
+    ),
+  );
+
+  $form['organization_number'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Organization number'),
+    '#states' => array(
+      'visible' => array(
+        '#edit-commerce-payment-payment-details-customer-type' => array('value' => 'company'),
+      ),
+    ),
+  );
+
+  // @todo: rename title? Distribution type sounds weird
+  $form['distribution_type'] = array(
+    '#type' => 'select',
+    '#title' => t('Distribution type'),
+    '#options' => array(
+      'EMAIL' => t('Email'),
+      'PAPER' => t('Paper'),
+    ),
+    '#default_value' => isset($settings['default_distribution_type']) ? $settings['default_distribution_type'] : 'EMAIL',
+  );
+
+  global $user;
+
+  $form['billing_email'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Billing e-mail'),
+    '#states' => array(
+      'visible' => array(
+        '#edit-commerce-payment-payment-details-distribution-type'  => array('value' => 'EMAIL')
+      ),
+    ),
+    '#default_value' => isset($user->mail) ? $user->mail : NULL,
+  );
+
+  if($settings['enable_comments']) {
+    $form['comments'] = array(
+      '#type' => 'textarea',
+      '#title' => t('Message'),
+    );
+  }
+  return $form;
+}
+
+
+function _commerce_dibs_invoice_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge) {
+  $order->data[$payment_method['method_id']] = $pane_values;
+}
+
 
 /**
  * Implements hook_commerce_payment_transaction_status_info().
