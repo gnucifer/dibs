@@ -61,11 +61,11 @@ function _commerce_dibs_invoice_settings_form($settings = NULL) {
   // @todo: restrict to default value option?
   $form['default_distribution_type'] = array(
     '#type' => 'select',
-    '#title' => t('Default distribution type'),
+    '#title' => t('Default type of invoice'),
     '#options' => array(
       // @todo: constants?
-      'EMAIL' => t('Email'),
-      'PAPER' => t('Paper'), // @todo paper-invoice?
+      'EMAIL' => t('E-mail invoice'),
+      'PAPER' => t('Paper invoice'), // @todo paper-invoice?
     ),
     '#default_value' => isset($settings['default_distribution_type']) ? $settings['default_distribution_type'] : 'EMAIL',
   );
@@ -149,10 +149,10 @@ function _commerce_dibs_invoice_submit_form($payment_method, $pane_values, $chec
   // @todo: rename title? Distribution type sounds weird
   $form['distribution_type'] = array(
     '#type' => 'select',
-    '#title' => t('Distribution type'),
+    '#title' => t('Type of invoice'),
     '#options' => array(
-      'EMAIL' => t('Email'),
-      'PAPER' => t('Paper'),
+      'EMAIL' => t('E-mail invoice'),
+      'PAPER' => t('Paper invoice'),
     ),
     '#default_value' => isset($settings['default_distribution_type']) ? $settings['default_distribution_type'] : 'EMAIL',
   );
@@ -162,6 +162,7 @@ function _commerce_dibs_invoice_submit_form($payment_method, $pane_values, $chec
   $form['billing_email'] = array(
     '#type' => 'textfield',
     '#title' => t('Billing e-mail'),
+    '#description' => t('The invoice will be sent to this e-mail'),
     '#states' => array(
       'visible' => array(
         '#edit-commerce-payment-payment-details-distribution-type'  => array('value' => 'EMAIL')
