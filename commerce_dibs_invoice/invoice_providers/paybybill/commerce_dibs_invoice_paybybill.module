@@ -7,7 +7,7 @@ function commerce_dibs_invoice_paybybill_commerce_payment_method_info() {
   $payment_methods['commerce_dibs_invoice_paybybill'] = array(
     'title' => t('DIBS invoice PayByBill'),
     'description' => t('Invoice payment using the DIBS PayByBill provider.'),
-    'display_title' => t('DIBS invoice PayByBill'),
+    'display_title' => t('DIBS invoice payment (PayByBill)'),
     'offsite' => TRUE,
   );
   return $payment_methods;
