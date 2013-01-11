@@ -47,14 +47,15 @@ function commerce_dibs_invoice_paybybill_redirect_form($form, &$form_state, $ord
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
 
   // Prepare the DIBS payment
-  $data = _commerce_dibs_dibs_transaction_data($order, 'commerce_dibs_invoice_paybybill', 'commerce_dibs_invoice_paybybill');
+  $data = _commerce_dibs_dibs_transaction_data($order, 'commerce_dibs_invoice', 'commerce_dibs_invoice');
   $hash = dibs_payment_prepare($data, FALSE);
   $dibs_transaction = dibs_transaction_hash_load($hash);
 
   // Prepare the commerce transaction
+
   $transaction = _commerce_dibs_commerce_transaction($order_wrapper, $payment_method, $dibs_transaction['tid']);
 
-  $settings = dibs_load_settings('commerce_dibs_invoice_paybybill', 'commerce_dibs_invoice_paybybill');
+  $settings = dibs_load_settings('commerce_dibs_invoice', 'commerce_dibs_invoice');
   $settings['auto_submit'] = 1;
 
   module_load_include('inc', 'dibs', 'dibs.frontend');

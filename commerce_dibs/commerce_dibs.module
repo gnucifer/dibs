@@ -410,7 +410,11 @@ function commerce_dibs_redirect_form($form, &$form_state, $order, $payment_metho
 
   $dibs_params = _commerce_dibs_commerce_order_dibs_data($order_wrapper);
 
-  $dibs_params['payType'] = !empty($settings['paytype']) ? $settings['paytype'] : 'ALL_CARDS';
-
+  $settings_mapping = array(
+    DIBS_PAYMENT_WINDOW  => 'paymentwindow',
+    DIBS_FLEXWIN => 'flexwindow',
+  );
+  $type = $settings_mapping[$settings['general']['type']];
+  $dibs_params['payType'] = !empty($settings[$type]['paytype']) ? $settings[$type]['paytype'] : 'ALL_CARDS';
   return drupal_get_form('dibs_frontend_redirect_form', $settings, $dibs_transaction, $dibs_params);
 }
