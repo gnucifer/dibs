@@ -4,6 +4,65 @@
  * Integrate DIBS payment gateway with Drupal Commerce
  */
 
+function _commerce_dibs_dibsapi_transaction_cancel($op, $delta, &$transaction, $a3, $a4) {
+  $commerce_transactions = commerce_payment_transaction_load_multiple(FALSE, array('remote_id' => $transaction['tid']));
+  $order = commerce_order_load($transaction['params']['commerce_order_id']);
+
+  if ($order && $commerce_transactions) {
+    drupal_set_message(t('You have canceled your payment at DIBS'), 'warning');
+    // Update transaction(s).
+    foreach ($commerce_transactions as $commerce_transaction) {
+      $commerce_transaction->message = 'Declined payment';
+      $commerce_transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
+      commerce_payment_transaction_save($commerce_transaction);
+    }
+    drupal_goto('checkout/' . $order->order_id . '/payment/back/' . $transaction['params']['payment_redirect_key']);
+  }
+  else {
+    // TODO: Set error message.
+  }
+}
+
+function _commerce_dibs_dibsapi_transaction_accept($op, $delta, &$transaction, $a3, $a4) {
+  $commerce_transactions = commerce_payment_transaction_load_multiple(FALSE, array('remote_id' => $transaction['tid']));
+  // Update transaction(s).
+  if ($commerce_transactions) {
+    if ($transaction['split_payments'] == 1) {
+      $commerce_transaction = array_shift($commerce_transactions);
+      $commerce_transaction->message = 'Payment completed at DIBS';
+      $commerce_transaction->status = COMMERCE_CREDIT_AUTH_ONLY;
+      $commerce_transaction->payload['dibs_id'] = $transaction['payment_transaction_id'];
+      commerce_payment_transaction_save($commerce_transaction);
+    }
+    else {
+      foreach ($commerce_transactions as $commerce_transaction) {
+        $delta = $commerce_transaction->payload['delta'];
+        $commerce_transaction->message = 'Payment completed at DIBS';
+        $commerce_transaction->status = COMMERCE_CREDIT_AUTH_ONLY;
+        $commerce_transaction->payload['dibs_id'] = $transaction['dibs_split_payments'][$delta];
+        commerce_payment_transaction_save($commerce_transaction);
+      }
+    }
+  }
+
+  $commerce_transactions = commerce_payment_transaction_load_multiple(FALSE, array('remote_id' => $transaction['tid']));
+  $order = commerce_order_load($transaction['params']['commerce_order_id']);
+
+  if ($order && $commerce_transactions) {
+    foreach ($commerce_transactions as $commerce_transaction) {
+      if ($commerce_transaction->status !== COMMERCE_CREDIT_AUTH_ONLY) {
+        watchdog('dibs_commerce', print_r($commerce_transaction, TRUE), array(), WATCHDOG_DEBUG);
+        drupal_set_message(t('Unable to verify your payment, please try again.'), 'error');
+        drupal_goto('checkout/' . $order->order_id . '/payment/back/' . $transaction['params']['payment_redirect_key']);
+      }
+    }
+    drupal_goto('checkout/' . $order->order_id . '/payment/return/' . $transaction['params']['payment_redirect_key']);
+  }
+  else {
+    // TODO: Set error message.
+  }
+}
+
 /**
  * Implementation of hook_dibsapi().
  */
@@ -19,70 +78,14 @@ function commerce_dibs_dibsapi($op = 'info', $delta = NULL, &$transaction = NULL
       }
       break;
     case 'transaction_cancel':
-      $commerce_transactions = commerce_payment_transaction_load_multiple(FALSE, array('remote_id' => $transaction['tid']));
-      $order = commerce_order_load($transaction['params']['commerce_order_id']);
-
-      if ($order && $commerce_transactions) {
-        drupal_set_message(t('You have canceled your payment at DIBS'), 'warning');
-        // Update transaction(s).
-        foreach ($commerce_transactions as $commerce_transaction) {
-          $commerce_transaction->message = 'Declined payment';
-          $commerce_transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
-          commerce_payment_transaction_save($commerce_transaction);
-        }
-        drupal_goto('checkout/' . $order->order_id . '/payment/back/' . $transaction['params']['payment_redirect_key']);
-      }
-      else {
-        // TODO: Set error message.
-      }
+      _commerce_dibs_dibsapi_transaction_cancel($op, $delta, $transaction, $a3, $a4); 
       break;
     case 'transaction_accept':
-
       watchdog('dibs_commerce', 'transaction accecpt: ' . $transaction['tid'], array(), WATCHDOG_DEBUG);
-
-      $commerce_transactions = commerce_payment_transaction_load_multiple(FALSE, array('remote_id' => $transaction['tid']));
-      // Update transaction(s).
-      if ($commerce_transactions) {
-        if ($transaction['split_payments'] == 1) {
-          $commerce_transaction = array_shift($commerce_transactions);
-          $commerce_transaction->message = 'Payment completed at DIBS';
-          $commerce_transaction->status = COMMERCE_CREDIT_AUTH_ONLY;
-          $commerce_transaction->payload['dibs_id'] = $transaction['payment_transaction_id'];
-          commerce_payment_transaction_save($commerce_transaction);
-        }
-        else {
-          foreach ($commerce_transactions as $commerce_transaction) {
-            $delta = $commerce_transaction->payload['delta'];
-            $commerce_transaction->message = 'Payment completed at DIBS';
-            $commerce_transaction->status = COMMERCE_CREDIT_AUTH_ONLY;
-            $commerce_transaction->payload['dibs_id'] = $transaction['dibs_split_payments'][$delta];
-            commerce_payment_transaction_save($commerce_transaction);
-          }
-        }
-      }
-
-
-      $commerce_transactions = commerce_payment_transaction_load_multiple(FALSE, array('remote_id' => $transaction['tid']));
-      $order = commerce_order_load($transaction['params']['commerce_order_id']);
-
-      if ($order && $commerce_transactions) {
-        foreach ($commerce_transactions as $commerce_transaction) {
-          if ($commerce_transaction->status !== COMMERCE_CREDIT_AUTH_ONLY) {
-            watchdog('dibs_commerce', print_r($commerce_transaction, TRUE), array(), WATCHDOG_DEBUG);
-            drupal_set_message(t('Unable to verify your payment, please try again.'), 'error');
-            drupal_goto('checkout/' . $order->order_id . '/payment/back/' . $transaction['params']['payment_redirect_key']);
-          }
-        }
-        drupal_goto('checkout/' . $order->order_id . '/payment/return/' . $transaction['params']['payment_redirect_key']);
-      }
-      else {
-        // TODO: Set error message.
-      }
+      _commerce_dibs_dibsapi_transaction_accept($op, $delta, $transaction, $a3, $a4);
       break;
     case 'transaction_callback':
-
       watchdog('dibs_commerce', 'transaction callback: ' . $transaction['tid'], array(), WATCHDOG_DEBUG);
-
       break;
   }
 }
@@ -92,14 +95,12 @@ function commerce_dibs_dibsapi($op = 'info', $delta = NULL, &$transaction = NULL
  */
 function commerce_dibs_commerce_payment_method_info() {
   $payment_methods = array();
-
   $payment_methods['commerce_dibs'] = array(
     'title' => t('DIBS'),
     'description' => t('Payment using the DIBS provider.'),
     'display_title' => t('DIBS Payment Services'),
     'offsite' => TRUE,
   );
-
   return $payment_methods;
 }
 
@@ -124,16 +125,13 @@ function commerce_dibs_commerce_payment_transaction_status_info() {
  */
 function commerce_dibs_settings_form($settings = NULL) {
   $form = array();
-
   $form['info']['#markup'] = l(t('Setup commerce dibs'), 'admin/config/payment/dibs/edit/commerce_dibs/commerce_dibs');
-
   $form['split'] = array(
     '#type' => 'checkbox',
     '#title' => t('Use split payments'),
     '#default_value' => $settings['split'],
     '#description' => t('Split each line item into a seperate transaction using split payments. Only works with flex window.'),
   );
-
   return $form;
 }
 
@@ -291,7 +289,7 @@ function _commerce_dibs_dibs_transaction_data($order, $api_module, $api_delta) {
     'api_delta'           => $api_delta,
     'payment_price'       => $order_wrapper->commerce_order_total->amount->value(),
     'payment_currency'    => $currency_info['numeric_code'],
-    'payment_order_id'    => '', // @todo ??
+    'payment_order_id'    => $order_wrapper->order_id->value(),
     'params'              => array(
       'commerce_order_id' => $order_wrapper->order_id->value(),
       'payment_redirect_key' => $order->data['payment_redirect_key'],
@@ -411,6 +409,8 @@ function commerce_dibs_redirect_form($form, &$form_state, $order, $payment_metho
   module_load_include('inc', 'dibs', 'dibs.frontend');
 
   $dibs_params = _commerce_dibs_commerce_order_dibs_data($order_wrapper);
+
+  $dibs_params['payType'] = !empty($settings['paytype']) ? $settings['paytype'] : 'ALL_CARDS';
 
   return drupal_get_form('dibs_frontend_redirect_form', $settings, $dibs_transaction, $dibs_params);
 }

@@ -37,17 +37,20 @@ function commerce_dibs_capture_order($order) {
   foreach ($commerce_transactions as $commerce_transaction) {
     // Only try to capture payments that are auth'ed and have a dibs id.
     if (
-        $commerce_transaction->payment_method == 'commerce_dibs' &&
         $commerce_transaction->status == COMMERCE_CREDIT_AUTH_ONLY &&
+        isset($commerce_transaction->remote_id) &&
         !empty($commerce_transaction->payload['dibs_id'])
     ) {
-      $capture = dibs_capture_transaction('commerce_dibs', 'commerce_dibs', $commerce_transaction->payload['dibs_id']);
-      if ($capture['status']) {
-        $commerce_transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
-        commerce_payment_transaction_save($commerce_transaction);
-      }
-      else {
-        $status = FALSE;
+      $dibs_transaction = dibs_transaction_load($commerce_transaction->remote_id);
+      if($dibs_transaction) {
+        $capture = dibs_capture_transaction($dibs_transaction['api_module'], $dibs_transaction['api_delta'], $commerce_transaction->payload['dibs_id']);
+        if ($capture['status']) {
+          $commerce_transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+          commerce_payment_transaction_save($commerce_transaction);
+        }
+        else {
+          $status = FALSE;
+        }
       }
     }
   }
