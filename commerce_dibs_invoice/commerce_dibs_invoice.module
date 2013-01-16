@@ -47,7 +47,6 @@ function _commerce_dibs_invoice_settings_form($settings = NULL) {
     '#title' => t('Enable customer comments'),
     '#default_value' => isset($settings['enable_comments']) ? $settings['enable_comments'] : NULL,
   );
-
   $form['default_customer_type'] = array(
     '#type' => 'select',
     '#title' => t('Default customer type'),
@@ -57,8 +56,6 @@ function _commerce_dibs_invoice_settings_form($settings = NULL) {
     ),
     '#default_value' => isset($settings['invoice_fee']) ? $settings['invoice_fee'] : 'private_person',
   );
-
-  // @todo: restrict to default value option?
   $form['default_distribution_type'] = array(
     '#type' => 'select',
     '#title' => t('Default type of invoice'),
@@ -69,7 +66,6 @@ function _commerce_dibs_invoice_settings_form($settings = NULL) {
     ),
     '#default_value' => isset($settings['default_distribution_type']) ? $settings['default_distribution_type'] : 'EMAIL',
   );
-
   /*
   $form['test'] = array(
     '#type' => t('Test mode'),
@@ -80,6 +76,7 @@ function _commerce_dibs_invoice_settings_form($settings = NULL) {
     ),
   );
   */
+  return $form;
 }
 
 // @todo dibs_data/dibs_params?? choose one
