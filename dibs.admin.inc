@@ -579,7 +579,6 @@ function _dibs_payment_types_element(&$element, $element_name, $module, $delta, 
       '#default_value' => isset($settings[$type]['selection']) ? $settings[$type]['selection'] : '',
     );
     $selection_selector = 'select[name="' . $element_name . '[' . implode('][', array('payment_types', $type, 'selection')) . ']"]';
-
     $element[$type]['types'] = array(
       '#title' => t('Select types'),
       '#type' => 'checkboxes',
@@ -589,7 +588,7 @@ function _dibs_payment_types_element(&$element, $element_name, $module, $delta, 
         ),
       ),
       '#options' => $info['types'],
-      '#default_value' => isset($settings[$type]['types']) ? $settings[$type]['types'] : NULL,
+      '#default_value' => isset($settings[$type]['types']) ? $settings[$type]['types'] : array(),
     );
   }
 }
