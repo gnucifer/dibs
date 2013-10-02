@@ -268,9 +268,11 @@ function _commerce_dibs_commerce_order_dibs_data($order_wrapper) {
     $dibs_data += _commerce_dibs_customer_billing_address_information(
       $order_wrapper->commerce_customer_billing->commerce_customer_address->value());
   }
-  if($order_wrapper->commerce_customer_shipping) {
-    $dibs_data += _commerce_dibs_customer_shipping_address_information(
-      $order_wrapper->commerce_customer_shipping->commerce_customer_address->value());
+  if(module_exists('commerce_shipping')) {
+    if($order_wrapper->commerce_customer_shipping) {
+      $dibs_data += _commerce_dibs_customer_shipping_address_information(
+        $order_wrapper->commerce_customer_shipping->commerce_customer_address->value());
+    }
   }
   return $dibs_data;
 }
