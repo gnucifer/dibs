@@ -122,24 +122,112 @@ function dibs_transaction_status_validate($code) {
   );
 }
 
+
+function dibs_language_options_list() {
+  return array(
+    ''   => '',
+    'da' => 'Danish',
+    'sv' => 'Swedish',
+    'no' => 'Norwegian',
+    'en' => 'English',
+    'nl' => 'Dutch',
+    'de' => 'German',
+    'fr' => 'French',
+    'fi' => 'Finnish',
+    'es' => 'Spanish',
+    'it' => 'Italian',
+    'pl' => 'Polish'
+  );
+}
+
+
+
+function dibs_currency_options_list() {
+  return array(
+    ''    => '',
+    '208' => 'Danish Kroner (DKK)',
+    '978' => 'Euro (EUR)',
+    '840' => 'US Dollar $ (USD)',
+    '826' => 'English Pound £ (GBP)',
+    '752' => 'Swedish Kronor (SEK)',
+    '036' => 'Australian Dollar (AUD',
+    '124' => 'Canadian Dollar (CAD)',
+    '352' => 'Icelandic Króna (ISK)',
+    '392' => 'Japanese Yen (JPY)',
+    '554' => 'New Zealand Dollar (NZD)',
+    '578' => 'Norwegian Kroner (NOK)',
+    '756' => 'Swiss Franc (CHF)',
+    '949' => 'Turkish Lire (TRY)',
+  );
+}
+
+function dibs_currency_codes() {
+  return array(
+    'DKK' => 208,
+    'EUR' => 978,
+    'USD' => 840,
+    'GBP' => 826,
+    'SEK' => 752,
+    'AUD' => 036,
+    'CAD' => 124,
+    'ISK' => 352,
+    'JPY' => 392,
+    'NZD' => 554,
+    'NOK' => 578,
+    'CHF' => 756,
+    'TRY' => 949,
+  );
+}
+
+function dibs_currency_code_to_number($code) {
+  $mapping = dibs_currency_codes();
+  return $mapping[$code];
+}
+
+function dibs_currency_number_to_code($number) {
+  $mapping = array_flip(dibs_currency_codes());
+  return $mapping[$number];
+}
+
+//TODO: add to hook_requirements!
+function dibs_registry_files_alter(&$files, $modules) {
+  $library_path = libraries_get_path('money_php');
+  if(!$library_path) {
+    return;
+  }
+  foreach (array('Money.php', 'Currency.php') as $filename) {
+    $files[$library_path . '/' . $filename] = array(
+      'module' => 'dibs',
+      'weight' => 0,
+    );
+  }
+}
+
 // http://tech.dibs.dk/integration_methods/dibs_payment_window/order_information/
+// TODO: dibs module should have (and save) an data oriented internal representation of dibs order
+// since format differs between integration methods
+// TODO: exceptions
+// TODO: Could/should use entity api for this?
 class DibsOrderInformation {
 
-  const QUANTITY = 'QUANTITY';
-  const DESCRIPTION = 'DESCRIPTION';
-  const AMOUNT = 'AMOUNT';
-  const VAT_AMOUNT = 'VATAMOUNT';
-  const VAT_PERCENT = 'VATPERCENT';
-  const ITEM_ID = 'ITEMID';
-  const UNIT_CODE = 'UNITCODE';
+  const QUANTITY = 'quantity';
+  const DESCRIPTION = 'descripiton';
+  const AMOUNT = 'amount';
+  const VAT_AMOUNT = 'vat_amount';
+  const VAT_PERCENT = 'vat_percent';
+  const ITEM_ID = 'item_id';
+  const UNIT_CODE = 'unit_code';
 
   const VALUE_SEPARATOR = ';';
 
   protected $rows = array();
   protected $types = array(); 
-  protected $types_labels = array();
+  protected $labels = array();
 
-  function __construct($types = NULL, $types_labels = NULL) {
+  protected $currency;
+
+  //Rename types to columns?
+  function __construct($types = NULL, $currency = NULL, $labels = NULL) {
     $this->types = array(
       self::QUANTITY,
       self::DESCRIPTION,
@@ -149,15 +237,50 @@ class DibsOrderInformation {
       self::ITEM_ID,
       self::UNIT_CODE,
     );
+
+    //TODO: Dibs documentation on this? Trial and error?
+    $required_types = array(
+      self::QUANTITY,
+      self::UNIT_CODE,
+      self::DESCRIPTION,
+      self::AMOUNT,
+      self::ITEM_ID,
+    );
+
+    $default_types = array(
+      self::QUANTITY,
+      self::DESCRIPTION,
+      self::AMOUNT,
+      self::VAT_PERCENT,
+      self::ITEM_ID,
+      self::UNIT_CODE,
+    );
+
     if(isset($types)) {
-      if(count(array_diff($types, $this->types))) {
+      $invalid_types = array_diff($types, $this->types);
+      if(!empty($invalid_types)) {
         //@todo: message
-        throw new Exception();
+        throw new Exception('Invalid types: ' . implode(', ', $invalid_types));
       }
       $this->types = $types;
-    }
 
-    $this->types_labels = array(
+      $missing_required_types = array_diff($required_types, $types);
+      if(!(in_array(self::VAT_AMOUNT, $types) || in_array(self::VAT_PERCENT, $types))) {
+        $missing_required_types[] = self::VAT_AMOUNT;
+        $missing_required_types[] = self::VAT_PERCENT;
+      }
+      if(!empty($missing_required_types)) {
+        throw new Exception('Missing required types: ' . implode(', ', $missing_required_types));
+      }
+      if(in_array(self::VAT_AMOUNT, $types) && in_array(self::VAT_PERCENT, $types)) {
+        throw new Exception('Only one of VAT_AMOUNT or VAT_PERCENT are allowed');
+      }
+    }
+    else {
+      $this->types = $default_types;
+    }
+       
+    $this->labels = array(
       self::QUANTITY => t('Quantity'),
       self::DESCRIPTION => t('Description'),
       self::AMOUNT => t('Amount'),
@@ -166,37 +289,51 @@ class DibsOrderInformation {
       self::ITEM_ID => t('Item id'),
       self::UNIT_CODE => t('Unit code'),
     );
-    if(isset($types_labels)) {
-      if(count(array_diff_key($types_labels, $this->types_labels))) {
-        throw new Exception();
+
+    if(isset($labels)) {
+      $invalid_type_labels = array_diff_key($labels, $this->labels);
+      if(!empty($invalid_type_labels)) {
+        throw new Exception('Invalid type labels for: ' . implode(', ', array_keys($invalid_type_labels)));
       }
-      $this->types_labels = $types_labels + $this->types_labels;
+      $this->labels = $labels + $this->labels;
+    }
+
+    //TODO: validate currency
+    if(in_array($currency, dibs_currency_codes())) {
+      $this->currency = $currency;
+    }
+    else {
+      throw new Exception('Invalid currency code: ' . $currency);
     }
   }
 
   protected function validate($type, $value) {
     //Some basic validation, not in any way complete
-    $value = (string) $value;
-    switch($type) {
-      case self::QUANTITY:
-      case self::AMOUNT:
-      case self::VAT_AMOUNT:
-      case self::VAT_PERCENT:    
-        if(!ctype_digit($value)) {
-          throw new Exception(
-            t('Invalid "!type" value: "!value", must be an integer value',
-            array('%!ype' => $type, '!value' => '!value')));
-        }
-      default:
-        // Unreachable?
-        if(!is_string($value)) {
-          throw new Exception(t('Invalid "!type" value, could not be converted to string', array('!type' => $type)));
-        }
-    }
+      $value = (string) $value;
+      switch($type) {
+        case self::QUANTITY:
+        case self::AMOUNT:
+        case self::VAT_AMOUNT:
+        case self::VAT_PERCENT:    
+          if(!ctype_digit($value)) {
+            throw new Exception(
+              t('Invalid "!type" value: "!value", must be an integer value',
+              array('%!ype' => $type, '!value' => '!value')));
+          }
+        default:
+          // Unreachable?
+          if(!is_string($value)) {
+            throw new Exception(t('Invalid "!type" value, could not be converted to string', array('!type' => $type)));
+          }
+      }
   }
 
   public function addRowAssoc(array $data) {
-    $keys = array_intersect($this->types, array_keys($data));
+    $types = array_keys($data);
+    if(count(array_diff_key($types, $this->types))) {
+      throw new Exception();
+    }
+    $keys = array_intersect($this->types, $types);
     $_data = array();
     foreach($keys as $key) {
       $_data[] = $data[$key];
@@ -212,30 +349,155 @@ class DibsOrderInformation {
     foreach($_data as $type => $value) {
       $this->validate($type, $value);
       //Escape separator
-      $_data[$type] = str_replace(self::VALUE_SEPARATOR, '\\' . self::VALUE_SEPARATOR, $value);
+      //$_data[$type] = str_replace(self::VALUE_SEPARATOR, '\\' . self::VALUE_SEPARATOR, $value);
     }
     $this->rows[] = $_data;
   }
 
-  function data() {
+  public function rows($vat_inclusive = FALSE) {
+    return $this->rows;
+  }
+
+  public function rows_vat_inclusive() {
+    // Local copy
+    $rows = $this->rows;
+    foreach($rows as &$row) {
+      $row[self::AMOUNT] += $this->calculate_vat($row);
+    }
+    return $rows;
+  }
+
+  public function columns() {
+    $rows_transposed = array();
+    foreach($this->types as $type) {
+      $rows_transposed[$type] = array();
+      foreach($this->rows as $i => $row) {
+        $rows_transposed[$type][$i] = $row[$type];
+      }
+    }
+    return $rows_transposed;
+  }
+
+  public function types() {
+    return $this->types;
+  }
+
+  public function labels() {
+    $labels = array();
+    foreach($this->types as $type) {
+      $labels[$type] = $this->labels[$type];
+    }
+    return $labels;
+  }
+
+  public function total_amount() {
+    //$amount_key = array_search(self::AMOUNT, $this->types);
+    return $this->total_amount_vat_exclusive() + $this->total_vat_amount();
+  }
+
+  public function total_vat_amount() {
+    $vat_amount = 0;
+    foreach($this->rows as $row) {
+      $vat_amount += $this->calculate_vat($row);
+    }
+    return $vat_amount;
+  }
+
+  public function total_amount_vat_exclusive() {
+    $total_amount = 0;
+    foreach($this->rows as $row) {
+      $total_amount += $row[self::AMOUNT] * $row[self::QUANTITY];
+    }
+    return $total_amount;
+  }
+
+  protected function calculate_vat($row) {
+    $amount = 0;
+    if(isset($row[self::VAT_AMOUNT])) {
+      $amount = $row[self::VAT_AMOUNT];
+    }
+    elseif(isset($row[self::VAT_PERCENT])) {
+      $amount = round($row[self::AMOUNT] * ($row[self::VAT_PERCENT] / 10000));
+    }
+    return $amount * $row[self::QUANTITY];
+  }
+
+  //Or implement this and the above as read only magic get?
+  public function currency() {
+    return $this->currency;
+  }
+
+}
+
+/*
+class FlexWinDibsOrderInformation extends DibsOrderInformation {
+}
+ */
+/*
+abstract class DibsOrderInformationData {
+  protected $order_information;
+  private $value_separator = ';';
+  function __construct(DibsOrderInformation $order_info) {
+  }
+}
+*/
+
+function dibs_order_information_data(DibsOrderInformation $order_info, $payment_type) {
+  if($payment_type == DIBS_FLEXWIN) {
+    //TODO
+    return array();
+  }
+  else if($payment_type == DIBS_PAYMENT_WINDOW) {
+    $types_mapping = array(
+      DibsOrderInformation::QUANTITY => 'QUANTITY',
+      DibsOrderInformation::DESCRIPTION => 'DESCRIPTION',
+      DibsOrderInformation::AMOUNT => 'AMOUNT',
+      DibsOrderInformation::VAT_AMOUNT => 'VATAMOUNT',
+      DibsOrderInformation::VAT_PERCENT => 'VATPERCENT',
+      DibsOrderInformation::ITEM_ID => 'ITEMID',
+      DibsOrderInformation::UNIT_CODE => 'UNITCODE',
+    );
+
     $data = array();
-    $data['oiTypes'] = implode(self::VALUE_SEPARATOR, $this->types);
+    $value_separator = ';';
+
+
+    $order_lines = array();
+
+    foreach($order_info->rows() as $row) {
+      $order_line = array();
+      foreach($row as $value) {
+        $order_line[] = str_replace($value_separator, '\\' . $value_separator, $value);
+      }
+      $order_lines[] = $order_line;
+    }
+
+    foreach($order_lines as $i => $row_data) {
+      $data['oiRow' . ($i + 1)] = implode($value_separator, $row_data);
+    }
+
+    $types = array();
+
+    foreach($order_info->types() as $key) {
+      $types[] = $types_mapping[$key];
+    }
+
+    $data['oiTypes'] = implode($value_separator, $types);
 
     //We don't use array_intersect_key because we want to make sure
     //correct order is maintained
     $labels = array();
-    foreach($this->types as $type) {
-      $labels[] = $this->types_labels[$type];
+    foreach($order_info->labels() as $value) {
+      $labels[] = str_replace($value_separator, '\\' . $value_separator, $value);
     }
-    //$data['oiNames'] = implode(self::VALUE_SEPARATOR, $labels);
 
-    foreach($this->rows as $i => $row_data) {
-      $line_number = $i + 1;
-      $data['oiRow' . $line_number] = implode(self::VALUE_SEPARATOR, $row_data);
-    }
+    //Dibs ignores this paramters? Don't work with hmac
+    //$data['oiNames'] = implode($value_separator, $labels);
+
     return $data;
   }
 }
+
 
 /**
  * Implementation of hook_init().
@@ -751,6 +1013,10 @@ function dibs_payment_prepare($data, $redirect = TRUE) {
   // Creating new api_hash
   $hash = sha1(time() . $order_id . drupal_get_private_key());
 
+  if(isset($data['order_information']) && !($data['order_information'] instanceof DibsOrderInformation)) {
+    throw new Exception('order_information must be instance of DibsOrderInformation');
+  }
+
   // Creating dibs transaction
   $transaction = array(
     'api_module' => $data['api_module'],
@@ -759,6 +1025,7 @@ function dibs_payment_prepare($data, $redirect = TRUE) {
     'order_info_short' => $data['order_info_short'],
     'order_info_long' => serialize($data['order_info_long']),
     'order_price_info' => serialize($data['order_price_info']),
+    'order_information' => isset($data['order_information']) ? $data['order_information'] : NULL,
     'payment_time' => date('Y-m-d H:i:s', time()),
     'payment_order_id' => $order_id,
     'payment_status' => 0,
@@ -880,14 +1147,10 @@ function dibs_create_price_line_data($lines) {
   $data = array();
   //TODO: validation
   $r = 0;
-  //$keys = array();
   foreach ($lines as $key => $value) {
     $field = 'priceinfo' . ++$r . '.' . drupal_ucfirst($key);
-    //$keys[] = $field;
     $data[$field] = $value;
   }
-  //TODO: valid?
-  //$data['priceinfo_keys'] = implode(',', $keys);
   return $data;
 }
 

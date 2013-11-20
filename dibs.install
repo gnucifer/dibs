@@ -85,6 +85,11 @@ function dibs_schema() {
         'not null' => TRUE,
         'description' => t('Order price info. Serialized'),
       ),
+      'order_information' => array(
+        'type' => 'text',
+        'description' => t('Dibs order information'),
+        'serialize' => TRUE,
+      ),
       'payment_time' => array(
         'type' => 'datetime', // empty 'type' generates PHP notice
         // 'mysql_type', 'pgsql_type', 'sqlite_type', etc.: If you need to use a record type not included in the officially supported list of types above, you can specify a type for each database backend. In this case, you can leave out the type parameter, but be advised that your schema will fail to load on backends that do not have a type specified.
@@ -463,5 +468,16 @@ function dibs_update_7002(&$sandbox) {
     'size' => 'tiny',
     'default' => -1,
     'description' => t('The dibs transaction status'),
+  ));
+}
+
+/**
+ * Add column for storing order information (the other fields are to be depricated, but keeping them for now)
+ */
+function dibs_update_7003(&$sandbox) {
+  db_add_field('dibs_transactions', 'order_information', array(
+    'type' => 'text',
+    'description' => t('Dibs order information'),
+    'serialize' => TRUE,
   ));
 }

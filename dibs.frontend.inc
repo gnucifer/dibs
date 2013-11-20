@@ -100,6 +100,12 @@ function dibs_payment_data($settings, $transaction, $extra_params = array()) {
   $accepturl = url($settings['callbacks']['accepturl'] . '/' . $transaction['api_hash'], array('absolute' => TRUE));
   $cancelurl = url($settings['callbacks']['cancelurl'] . '/' . $transaction['api_hash'], array('absolute' => TRUE));
   $lang = $settings['general']['lang']; //@todo: fix!
+
+  if($transaction['order_information']) {
+    $order_information = unserialize($transaction['order_information']);
+    $data += dibs_order_information_data($order_information, $settings['general']['type']);
+  }
+
   
   // Payment Window fields
   if ($settings['general']['type'] === DIBS_PAYMENT_WINDOW) {
@@ -478,6 +484,18 @@ function dibs_handle_response($response, $transaction, $op, $messages = TRUE) {
     watchdog_exception('dibs', $e);
     throw $e;
   }
+  
+  if($op == 'transaction_callback') {
+    //Same for paymentwindow/flexwin?
+    $mapping = array(
+      'ACCEPTED' => 'transaction_accept',
+      'DECLINED' => 'transaction_decline',
+      'PENDING' => 'transaction_pending',
+      'CANCELLED' => 'transaction_cancel',
+    );
+    $op = isset($mapping[$response['status']]) ? $mapping[$response['status']] : 'transaction_unknown';
+  }
+
   // Invoking the module that implemented the payment
   $function = $transaction['api_module'] . '_dibsapi';
   if (function_exists($function)) {
@@ -528,7 +546,6 @@ function dibs_handle_payment_window_response($response, $transaction, $settings,
 
     // Reload the transaction.
     $transaction = dibs_transaction_load($transaction['tid']);
-    
 
     return $transaction;
   }

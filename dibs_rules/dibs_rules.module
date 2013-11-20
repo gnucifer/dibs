@@ -1,0 +1,149 @@
+<?php
+
+function dibs_rules_dibsapi($op = 'info', $delta = NULL, &$transaction = NULL, $a3 = NULL, $a4 = NULL) {
+  switch($op) {
+    case 'info':
+      $info['dibs_rules'] = array('info' => t('Dibs rules'));
+      if(!empty($delta)) {
+        return isset($info[$delta]) ? $info[$delta] : NULL;
+      }
+      else {
+        return $info;
+      }
+      break;
+      //TODO: general payment event with op parameter
+    case 'transaction_cancel':
+      rules_invoke_event('dibs_rules_payment_canceled', (object) $transaction);
+      break;
+    case 'transaction_accept':
+      rules_invoke_event('dibs_rules_payment_accepted', (object) $transaction);
+      break;
+    case 'transaction_declined':
+      rules_invoke_event('dibs_rules_payment_declined', (object) $transaction);
+    case 'transaction_pending':
+      rules_invoke_event('dibs_rules_payment_pending', (object) $transaction);
+      //$info = $op . ' ' . print_r($transaction, TRUE);
+      //drupal_set_message($info);
+      //watchdog('debug', $info);
+      break;
+  }
+}
+
+/**
+ * Implements hook_theme()
+ */
+function dibs_rules_theme() {
+  return array(
+    'dibs_order_information_text' => array(
+      'variables' => array('order_information' => NULL),
+    ),
+  );
+}
+
+
+function theme_dibs_order_information_text($variables) {
+  //$column_l
+  //Currency and lots of shit
+  $order_info = $variables['order_information'];
+  /*
+  $columns_maxlen = array();
+  $labels = $order_info->labels();
+  $columns = $order_info->columns();
+  foreach($columns as $type => $column) {
+    $columns_maxlen[$type] = max(
+      array_map(
+        'strlen',
+        array_merge($column, array($labels[$type]))
+      )
+    );
+  }
+  */
+
+  $output = array();
+
+  foreach($order_info->rows_vat_inclusive() as $row) {
+    $row_output = '';
+    if($row[DibsOrderInformation::QUANTITY] > 1) {
+      $row_output = $row[DibsOrderInformation::QUANTITY] . ' ';
+      if(isset($row[DibsOrderInformation::UNIT_CODE])) {
+        $row_output .= $row[DibsOrderInformation::UNIT_CODE] . ' ';
+      }
+    }
+    $row_output .= $row[DibsOrderInformation::DESCRIPTION];
+
+    if(isset($row[DibsOrderInformation::ITEM_ID])) {
+      $row_output .= ' (' .  t('item id') .': ' . $row[DibsOrderInformation::ITEM_ID] . ')'; 
+    }
+
+    $currency = new Currency(dibs_currency_number_to_code($order_info->currency()));
+    $amount = new Money($row[DibsOrderInformation::AMOUNT], $currency);
+
+    $row_output .=  ', ' . $amount->format();
+    
+    if(!empty($row[DibsOrderInformation::VAT_PERCENT]) || !empty($row[DibsOrderInformation::VAT_AMOUNT])) {
+      $row_output .=  ' (' .  t('VAT-inclusive') . ')';
+      $vat_percent = round(
+        !empty($row[DibsOrderInformation::VAT_PERCENT]) ?
+          $row[DibsOrderInformation::VAT_PERCENT] / 100 :
+          $row[DibsOrderInformation::VAT_AMOUNT] / $row[DibsOrderInformation::AMOUNT]
+      );
+      $row_output .= ', ' . $vat_percent . '% ' . t('VAT');
+    }
+    $output[] = $row_output;
+  }
+
+
+  $output[] = '';
+  $total_amount = new Money($order_info->total_vat_amount(), $currency);
+  $output[] = t('Total VAT') . ': ' . $total_amount->format();
+
+  $output[] = '';
+  $total_amount = new Money($order_info->total_amount(), $currency);
+  $output[] = t('Total amount') . ': ' . $total_amount->format() . ' (' .  t('VAT-inclusive') . ')';
+
+  // \n\r??
+  return implode("\n", $output);
+}
+
+
+function dibs_rules_token_info() {
+  module_load_include('rules.inc', 'dibs_rules');
+  //TODO: make rules entity/api figure these out automatically,
+  // or provide such a function of our own
+  $tokens = array();
+  
+  $data_info = dibs_rules_rules_data_info();
+
+  foreach($data_info['dibs_transaction']['property info'] as $name => $info) {
+    $tokens[$name] = array(
+      'name' => $info['label'],
+      'description' => $info['type'],
+    );
+  }
+
+  return array(
+    'types' => array(
+      'dibs_transaction' => array(
+        'name' => t('Dibs transaction'),
+        'description' => t('Tokens related to individual dibs transactions.'),
+        'needs-data' => 'dibs_transaction',
+      ),
+    ),
+    'tokens' => array(
+      'dibs_transaction' => $tokens,
+    ),  
+  );
+}
+
+
+function dibs_rules_tokens($type, $tokens, $data, $options = array()) {
+  $replacements = array();
+  if($type == 'dibs_transaction' && !empty($data['dibs_transaction'])) {
+    $dibs_transaction = $data['dibs_transaction'];
+    $wrapper = rules_wrap_data($dibs_transaction, array('type' => 'dibs_transaction'));
+    foreach($tokens as $name => $original) {
+      $replacements[$original] = $wrapper->get($name)->value();
+    }
+  }
+  return $replacements;
+}
