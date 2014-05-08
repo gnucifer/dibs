@@ -59,6 +59,9 @@ function dibs_frontend_redirect_page($transaction) {
 
 function dibs_payment_data($settings, $transaction, $extra_params = array()) {
   $data = array();
+
+  $order = commerce_order_load_by_number($transaction['payment_order_id']);
+
   if (isset($transaction['payment_retry_count']) && $transaction['payment_retry_count']) {
     $data['payment_order_id'] =  $transaction['payment_order_id'] . '-' . $transaction['payment_retry_count'];
   }
@@ -117,6 +120,8 @@ function dibs_payment_data($settings, $transaction, $extra_params = array()) {
     $data['cancelreturnurl'] = $cancelurl;
     $data['language'] = $lang;
 
+    $data['billingEmail'] = $order->mail;
+
     if(!empty($settings['paymentwindow']['paytype'])) {
       $data['payType'] = $settings['paymentwindow']['paytype'];
     }
@@ -149,7 +154,6 @@ function dibs_payment_data($settings, $transaction, $extra_params = array()) {
     // will only the short version show up in the administration.
 
     //TODO: convert to payment window format (if possible)
-    //billingMail etc
     if (!empty($transaction['order_info_long'])) {
       $data += dibs_create_order_line_data($transaction['order_info_long']);
     }
